@@ -1,0 +1,39 @@
+version: '2'
+
+environment:
+  BUNDLE_GEMFILE: /app/Gemfile
+
+compose:
+  files:
+    - docker-compose.yml
+
+interaction:
+  bash:
+    service: app
+    compose_run_options: [no-deps]
+
+  app:
+    service: app
+    subcommands:
+      console:
+        command: ./bin/console
+      clean:
+        command: rm -rf Gemfile.lock
+
+  bundle:
+    service: app
+    command: bundle
+    compose_run_options: [no-deps]
+
+  rspec:
+    service: app
+    command: bundle exec rspec
+
+  rubocop:
+    service: app
+    command: bundle exec rubocop
+    compose_run_options: [no-deps]
+
+provision:
+  - dip app clean
+  - dip bundle install
