@@ -41,8 +41,8 @@ gem install schked
 config/schedule.rb
 
 ```ruby
-cron "*/5 * * * *" do
-  Scheduler::CleanOrphanAttachmentsJob.perform_later
+cron "* */2 * * *" do
+  CleanOrphanAttachmentsJob.perform_later
 end
 ```
 
