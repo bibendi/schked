@@ -1,0 +1,7 @@
+#!/usr/bun/ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require "schked/cli"
+
+Schked::CLI.start(ARGV)
