@@ -1,4 +1,4 @@
-[![Gem Version](https://badge.fury.io/rb/schked.svg)](https://badge.fury.io/rb/activerecord-postgres_enum)
+[![Gem Version](https://badge.fury.io/rb/schked.svg)](https://badge.fury.io/rb/schked)
 [![Build Status](https://travis-ci.org/bibendi/schked.svg?branch=master)](https://travis-ci.org/bibendi/schked)
 
 # Schked
