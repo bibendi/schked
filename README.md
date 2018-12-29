@@ -49,7 +49,7 @@ end
 config/initializers/schked.rb
 
 ```ruby
-Schked.file_paths << Rails.root.join("config", "schedule.rb")
+Schked.paths << Rails.root.join("config", "schedule.rb")
 ```
 
 engines/lib/foo/engine.rb
@@ -58,7 +58,7 @@ engines/lib/foo/engine.rb
 module Foo
   class Engine < ::Rails::Engine
     initializer "foo" do |app|
-      Schked.file_paths << root.join("config", "schedule.rb")
+      Schked.paths << root.join("config", "schedule.rb")
     end
   end
 end
