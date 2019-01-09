@@ -10,4 +10,8 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  config.before do
+    Schked.instance_eval { @config = nil }
+  end
 end

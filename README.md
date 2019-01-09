@@ -54,7 +54,7 @@ engine-path/lib/foo/engine.rb
 module Foo
   class Engine < ::Rails::Engine
     initializer "foo" do |app|
-      Schked.paths << root.join("config", "schedule.rb")
+      Schked.config.paths << root.join("config", "schedule.rb")
     end
   end
 end

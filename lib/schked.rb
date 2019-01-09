@@ -2,18 +2,20 @@
 
 require "rufus/scheduler"
 
+require "schked/config"
 require "schked/version"
 require "schked/railtie" if defined?(Rails)
 
 module Schked
   module_function
 
-  def paths
-    @paths ||= []
+  def config
+    @config ||= Config.new
   end
 
   def schedule
-    paths.
+    config.
+      paths.
       map { |path| File.read(path) }.
       join("\n")
   end
