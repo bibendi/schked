@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "schked"
 require "thor"
 require "shellwords"
 
@@ -30,7 +29,7 @@ module Schked
     def start
       load_requires
 
-      Schked.start
+      Schked.worker.wait
     end
 
     desc "show", "Output schedule to stdout"
@@ -39,16 +38,19 @@ module Schked
       load_requires
 
       puts "====="
-      puts Schked.schedule
+      puts Schked.worker.schedule
       puts "====="
     end
 
     private
 
     def load_requires
-      return unless options[:require]&.any?
+      if options[:require]&.any?
+        options[:require].each { |file| require(File.join(Dir.pwd, file)) }
+      end
 
-      options[:require].each { |file| require(File.join(Dir.pwd, file)) }
+      # We have to load Schked at here, because of Rails and our railtie.
+      require "schked"
     end
   end
 end

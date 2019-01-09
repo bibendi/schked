@@ -46,19 +46,15 @@ cron "* */2 * * *" do
 end
 ```
 
-config/initializers/schked.rb
+If you have a Rails engine with own schedule:
 
-```ruby
-Schked.paths << Rails.root.join("config", "schedule.rb")
-```
-
-engines/lib/foo/engine.rb
+engine-path/lib/foo/engine.rb
 
 ```ruby
 module Foo
   class Engine < ::Rails::Engine
     initializer "foo" do |app|
-      Schked.paths << root.join("config", "schedule.rb")
+      Schked.config.paths << root.join("config", "schedule.rb")
     end
   end
 end
@@ -74,6 +70,30 @@ To show schedule:
 
 ```sh
 bundle exec schked show
+```
+
+### Callbacks
+
+Also, you can define callbacks for errors handling:
+
+config/initializers/schked.rb
+
+```ruby
+Schked.config.register_callback(:on_error) do |job, error|
+  Raven.capture_exception(error) if defined?(Raven)
+end
+```
+
+There are `:before_start` and `:after_finish` callbacks as well.
+
+### Logging
+
+By default Schked writes logs into stdout. In Rails environment Schked is using application logger. You can change it like this:
+
+config/initializers/schked.rb
+
+```ruby
+Schked.config.logger = Logger.new(Rails.root.join("log", "schked.log"))
 ```
 
 ## Contributing
