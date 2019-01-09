@@ -46,13 +46,9 @@ cron "* */2 * * *" do
 end
 ```
 
-config/initializers/schked.rb
+If you have a Rails engine with own schedule:
 
-```ruby
-Schked.paths << Rails.root.join("config", "schedule.rb")
-```
-
-engines/lib/foo/engine.rb
+engine-path/lib/foo/engine.rb
 
 ```ruby
 module Foo

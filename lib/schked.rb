@@ -3,6 +3,7 @@
 require "rufus/scheduler"
 
 require "schked/version"
+require "schked/railtie" if defined?(Rails)
 
 module Schked
   module_function

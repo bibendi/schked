@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "schked"
 require "thor"
 require "shellwords"
 
@@ -46,9 +45,12 @@ module Schked
     private
 
     def load_requires
-      return unless options[:require]&.any?
+      if options[:require]&.any?
+        options[:require].each { |file| require(File.join(Dir.pwd, file)) }
+      end
 
-      options[:require].each { |file| require(File.join(Dir.pwd, file)) }
+      # We have to load Schked at here, because of Rails and our railtie.
+      require "schked"
     end
   end
 end
