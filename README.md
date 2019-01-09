@@ -72,6 +72,30 @@ To show schedule:
 bundle exec schked show
 ```
 
+### Callbacks
+
+Also, you can define callbacks for errors handling:
+
+config/initializers/schked.rb
+
+```ruby
+Schked.config.register_callback(:on_error) do |job, error|
+  Raven.capture_exception(error) if defined?(Raven)
+end
+```
+
+There are `:before_start` and `:after_finish` callbacks as well.
+
+### Logging
+
+By default Schked writes logs into stdout. In Rails environment Schked is using application logger. You can change it like this:
+
+config/initializers/schked.rb
+
+```ruby
+Schked.config.logger = Logger.new(Rails.root.join("log", "schked.log"))
+```
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/bibendi/schked. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.

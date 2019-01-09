@@ -2,6 +2,7 @@
 
 require "bundler/setup"
 require "schked"
+require "pry-byebug"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -9,9 +10,5 @@ RSpec.configure do |config|
 
   config.expect_with :rspec do |c|
     c.syntax = :expect
-  end
-
-  config.before do
-    Schked.instance_eval { @config = nil }
   end
 end

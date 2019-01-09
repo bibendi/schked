@@ -29,7 +29,7 @@ module Schked
     def start
       load_requires
 
-      Schked.start
+      Schked.worker.wait
     end
 
     desc "show", "Output schedule to stdout"
@@ -38,7 +38,7 @@ module Schked
       load_requires
 
       puts "====="
-      puts Schked.schedule
+      puts Schked.worker.schedule
       puts "====="
     end
 

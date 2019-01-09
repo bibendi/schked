@@ -11,4 +11,6 @@ describe Schked::Config do
       expect(config.paths).to eq %w[foo bar]
     end
   end
+
+  it { expect(config.logger).to be_a(Logger) }
 end
