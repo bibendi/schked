@@ -41,7 +41,7 @@ gem install schked
 config/schedule.rb
 
 ```ruby
-cron "* */2 * * *" do
+cron "*/30 * * * *", as: "CleanOrphanAttachmentsJob" do
   CleanOrphanAttachmentsJob.perform_later
 end
 ```
@@ -94,6 +94,33 @@ config/initializers/schked.rb
 
 ```ruby
 Schked.config.logger = Logger.new(Rails.root.join("log", "schked.log"))
+```
+
+### Testing
+
+```ruby
+describe Schked do
+  let(:worker) { described_class.worker.tap(&:pause) }
+
+  around do |ex|
+    Time.use_zone("UTC") { Timecop.travel(start_time, &ex) }
+  end
+
+  describe "CleanOrphanAttachmentsJob" do
+    let(:start_time) { Time.zone.local(2008, 9, 1, 10, 42, 21) }
+    let(:job) { worker.job("CleanOrphanAttachmentsJob") }
+
+    specify do
+      expect(job.next_time.to_local_time)
+        .to eq Time.zone.local(2008, 9, 1, 11, 0, 0)
+    end
+
+    it "enqueues job" do
+      expect { job.call(false) }
+        .to have_enqueued_job(CleanOrphanAttachmentsJob)
+    end
+  end
+end
 ```
 
 ## Contributing
