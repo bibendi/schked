@@ -7,12 +7,12 @@ module Schked
   class CLI < Thor
     def self.start(argv)
       if File.exist?(".schked")
-        argv += File.
-          read(".schked").
-          split("\n").
-          join(" ").
-          strip.
-          shellsplit
+        argv += File
+          .read(".schked")
+          .split("\n")
+          .join(" ")
+          .strip
+          .shellsplit
       end
 
       super(argv)

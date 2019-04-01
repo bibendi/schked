@@ -30,10 +30,10 @@ module Schked
     end
 
     def schedule
-      config.
-        paths.
-        map { |path| File.read(path) }.
-        join("\n")
+      config
+        .paths
+        .map { |path| File.read(path) }
+        .join("\n")
     end
 
     private

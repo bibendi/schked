@@ -53,9 +53,9 @@ describe Schked::Worker do
       counter = 0
       config.register_callback(:on_error) { counter += 1 }
 
-      expect_any_instance_of(Schked::Worker).
-        to receive(:schedule).
-        and_return("self.in('0s', as: :test_task) { raise 'Boom' }")
+      expect_any_instance_of(Schked::Worker)
+        .to receive(:schedule)
+        .and_return("self.in('0s', as: :test_task) { raise 'Boom' }")
 
       worker
 
