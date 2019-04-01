@@ -13,6 +13,14 @@ module Schked
       load_schedule
     end
 
+    def job(as)
+      scheduler.jobs.find { |job| job.opts[:as] == as }
+    end
+
+    def pause
+      scheduler.pause
+    end
+
     def wait
       scheduler.join
     end
@@ -22,10 +30,10 @@ module Schked
     end
 
     def schedule
-      config.
-        paths.
-        map { |path| File.read(path) }.
-        join("\n")
+      config
+        .paths
+        .map { |path| File.read(path) }
+        .join("\n")
     end
 
     private
