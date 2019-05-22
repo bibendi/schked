@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   app:
-    image: ruby:2.5.1
+    image: ruby:2.6
     environment:
       - BUNDLE_PATH=/bundle
       - BUNDLE_CONFIG=/app/.bundle/config

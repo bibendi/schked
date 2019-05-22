@@ -8,13 +8,11 @@ compose:
     - docker-compose.yml
 
 interaction:
-  bash:
-    service: app
-    compose_run_options: [no-deps]
-
   app:
     service: app
     subcommands:
+      bash:
+        command: /bin/bash
       console:
         command: ./bin/console
       clean:
