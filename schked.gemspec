@@ -24,5 +24,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rspec", "~> 3.0"
   s.add_development_dependency "rubocop", "~> 0.60"
   s.add_development_dependency "rubocop-rspec"
-  s.add_development_dependency "standard"
+  s.add_development_dependency "standard", "~> 0.0.39"
 end
