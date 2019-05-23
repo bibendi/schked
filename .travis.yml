@@ -1,3 +1,7 @@
+language: ruby
+rvm:
+  - 2.6
+
 sudo: require
 
 services:
@@ -5,11 +9,14 @@ services:
 
 install:
   - gem install dip
+  - gem install danger
 
 before_script:
   - unset BUNDLE_GEMFILE
   - dip provision
 
 script:
-  - dip rspec
+  - danger
   - dip rubocop
+  - dip rspec
+
