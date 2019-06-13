@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "spec_helper"
+
 describe Schked::Config do
   subject(:config) { described_class.new }
 

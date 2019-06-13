@@ -16,16 +16,29 @@ interaction:
       console:
         command: ./bin/console
       clean:
-        command: rm -rf Gemfile.lock
+        command: rm -rf Gemfile.lock gemfiles/*.gemfile.*
 
   bundle:
     service: app
     command: bundle
     compose_run_options: [no-deps]
 
+  appraisal:
+    service: app
+    command: bundle exec appraisal
+    compose_run_options: [no-deps]
+
   rspec:
     service: app
-    command: bundle exec rspec
+    command: bundle exec appraisal bundle exec rspec
+
+  agnostic:
+    service: app
+    command: bundle exec appraisal agnostic bundle exec
+
+  rails:
+    service: app
+    command: bundle exec appraisal rails bundle exec
 
   rubocop:
     service: app
@@ -35,3 +48,4 @@ interaction:
 provision:
   - dip app clean
   - dip bundle install
+  - dip appraisal install
