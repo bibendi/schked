@@ -7,5 +7,3 @@ require "combustion"
 Combustion.initialize!
 
 require "spec_helper"
-
-
