@@ -18,5 +18,6 @@ before_script:
 script:
   - danger
   - dip rubocop
-  - dip rspec
+  - dip agnostic rspec spec/lib
+  - dip rails rspec spec/rails
 

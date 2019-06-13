@@ -10,6 +10,10 @@ module Schked
       @paths ||= []
     end
 
+    def logger?
+      !!@logger
+    end
+
     def logger
       @logger ||= Logger.new(STDOUT).tap { |l| l.level = Logger::INFO }
     end
