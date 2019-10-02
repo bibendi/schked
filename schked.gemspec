@@ -5,11 +5,11 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "schked/version"
 
 Gem::Specification.new do |s|
-  s.name          = "schked"
-  s.version       = Schked::VERSION
-  s.authors       = ["bibendi@evilmartians.com"]
-  s.summary       = "Ruby Scheduler"
-  s.description   = "Rufus-scheduler wrapper to run recurring jobs"
+  s.name = "schked"
+  s.version = Schked::VERSION
+  s.authors = ["bibendi@evilmartians.com"]
+  s.summary = "Ruby Scheduler"
+  s.description = "Rufus-scheduler wrapper to run recurring jobs"
 
   s.files = Dir["{exe,lib}/**/*", "Rakefile"]
   s.bindir = "exe"
