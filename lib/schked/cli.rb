@@ -46,7 +46,7 @@ module Schked
 
     def load_requires
       if options[:require]&.any?
-        options[:require].each { |file| require(File.join(Dir.pwd, file)) }
+        options[:require].each { |file| load(File.join(Dir.pwd, file)) }
       end
 
       # We have to load Schked at here, because of Rails and our railtie.
