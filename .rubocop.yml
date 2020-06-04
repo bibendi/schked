@@ -7,6 +7,7 @@ inherit_gem:
 AllCops:
   Exclude:
     - 'bin/*'
+    - 'exe/*'
     - 'tmp/**/*'
     - 'Gemfile'
     - 'node_modules/**/*'
