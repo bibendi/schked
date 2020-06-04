@@ -4,4 +4,11 @@
 require "bundler/setup"
 require "schked/cli"
 
-Schked::CLI.start(ARGV)
+begin
+  Schked::CLI.start(ARGV)
+rescue Exception => e
+  $stderr.puts "Schked exited with error"
+  $stderr.puts(e.message) if e.respond_to?(:message)
+  $stderr.puts(e.backtrace.join("\n")) if e.respond_to?(:backtrace) && e.backtrace.respond_to?(:join)
+  exit 1
+end

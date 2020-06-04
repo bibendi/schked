@@ -1,5 +1,3 @@
-inherit_from: ".rubocop-rspec.yml"
-
 require:
   - standard/cop/semantic_blocks
 
@@ -9,25 +7,9 @@ inherit_gem:
 AllCops:
   Exclude:
     - 'bin/*'
+    - 'exe/*'
     - 'tmp/**/*'
     - 'Gemfile'
     - 'node_modules/**/*'
     - 'vendor/**/*'
   DisplayCopNames: true
-
-Standard/SemanticBlocks:
-  Enabled: false
-
-Style/TrailingCommaInArrayLiteral:
-  EnforcedStyleForMultiline: no_comma
-
-Style/TrailingCommaInHashLiteral:
-  EnforcedStyleForMultiline: no_comma
-
-Layout/AlignParameters:
-  EnforcedStyle: with_first_parameter
-
-Rails/Output:
-  Enabled: true
-  Exclude:
-    - 'lib/tasks/**/*'

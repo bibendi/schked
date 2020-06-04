@@ -20,11 +20,9 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "appraisal", "~> 2.2"
   s.add_development_dependency "bundler", ">= 1.16"
-  s.add_development_dependency "combustion", "~> 1.1"
-  s.add_development_dependency "pry-byebug", "~> 3.4"
+  s.add_development_dependency "combustion", "~> 1.3"
+  s.add_development_dependency "pry-byebug", "~> 3.9"
   s.add_development_dependency "rake", "~> 13.0"
-  s.add_development_dependency "rspec", "~> 3.0"
-  s.add_development_dependency "rubocop", "~> 0.60"
-  s.add_development_dependency "rubocop-rspec"
-  s.add_development_dependency "standard", "~> 0.1.0"
+  s.add_development_dependency "rspec", "~> 3.9"
+  s.add_development_dependency "standard", "~> 0.4"
 end
