@@ -35,7 +35,7 @@ gem install schked
 .schked
 
 ```
---require config/environment
+--require config/environment.rb
 ```
 
 config/schedule.rb
