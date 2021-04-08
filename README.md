@@ -96,6 +96,10 @@ config/initializers/schked.rb
 Schked.config.logger = Logger.new(Rails.root.join("log", "schked.log"))
 ```
 
+### Monitoring
+
+[Yabeda::Schked](https://github.com/yabeda-rb/yabeda-schked) - built-in metrics for monitoring Schked recurring jobs out of the box! Part of the [yabeda](https://github.com/yabeda-rb/yabeda) suite.
+
 ### Testing
 
 ```ruby
