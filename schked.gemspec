@@ -24,5 +24,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "pry-byebug", "~> 3.9"
   s.add_development_dependency "rake", "~> 13.0"
   s.add_development_dependency "rspec", "~> 3.9"
-  s.add_development_dependency "standard", "~> 0.4"
+  s.add_development_dependency "standard", "~> 1.1"
 end
