@@ -1,57 +1,51 @@
-version: '4'
+version: '7'
 
 compose:
   files:
     - docker-compose.yml
 
 interaction:
-  app:
-    service: app
-    subcommands:
-      bash:
-        command: /bin/bash
-      console:
-        command: ./bin/console
-      clean:
-        command: rm -rf Gemfile.lock gemfiles/*.gemfile.*
-
-  shell:
+  bash:
     description: Open the Bash shell in app's container
-    service: app
+    service: ruby
     command: /bin/bash
 
   pry:
     description: Open Pry console
-    service: app
+    service: ruby
     command: ./bin/console
 
   bundle:
     description: Run Bundler commands
-    service: app
+    service: ruby
     command: bundle
 
   appraisal:
     description: Run Appraisal commands
-    service: app
+    service: ruby
     command: bundle exec appraisal
 
   rspec:
     description: Run Rspec commands
-    service: app
+    service: ruby
     command: bundle exec rspec
     subcommands:
       agnostic:
+        default_args: spec/lib
         command: bundle exec appraisal agnostic bundle exec rspec
 
       rails:
-        command: bundle exec appraisal rails bundle exec rspec
+        default_args: spec/rails
+        command: bundle exec appraisal bundle exec rspec
 
-  rubocop:
-    description: Run Rubocop commands
-    service: app
-    command: bundle exec rubocop
+  standardrb:
+    description: Run Standard commands
+    service: ruby
+    command: bundle exec standardrb
 
 provision:
+  - cp -f lefthook-local.dip_example.yml lefthook-local.yml
+  - dip compose down --volumes
   - rm -f Gemfile.lock gemfiles/*
   - dip bundle install
   - dip appraisal install

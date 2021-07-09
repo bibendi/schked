@@ -1,0 +1,35 @@
+name: Ruby
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ '**' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # waiting for the fix https://github.com/thoughtbot/appraisal/issues/186 to test on Ruby 3
+        ruby: [ '2.6', '2.7' ]
+    env:
+      RUBY_IMAGE: ${{ matrix.ruby }}
+    name: Ruby ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
+      - name: Install dependencies
+        run: |
+          gem install dip
+          dip provision
+      - name: Run linters
+        run: dip standardrb
+      - name: Run agnostic tests
+        run: dip rspec agnostic
+      - name: Run Rails tests
+        run: dip rspec rails

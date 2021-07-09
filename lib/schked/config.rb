@@ -15,7 +15,7 @@ module Schked
     end
 
     def logger
-      @logger ||= Logger.new(STDOUT).tap { |l| l.level = Logger::INFO }
+      @logger ||= Logger.new($stdout).tap { |l| l.level = Logger::INFO }
     end
 
     def register_callback(name, &block)

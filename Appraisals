@@ -5,6 +5,12 @@ appraise "agnostic" do
 end
 
 # Test with latest Ruby on Rails
-appraise "rails" do
-  gem "rails", "~> 4"
+if RUBY_VERSION < "3"
+  appraise "rails.5" do
+    gem "rails", "~> 5"
+  end
+end
+
+appraise "rails.6" do
+  gem "rails", "~> 6"
 end
