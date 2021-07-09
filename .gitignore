@@ -13,3 +13,6 @@
 /Gemfile.lock
 /gemfiles/*.gemfile.lock
 /spec/internal/log/*.log
+
+.lefthook-local/
+lefthook-local.yml
