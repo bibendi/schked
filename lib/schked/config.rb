@@ -4,7 +4,8 @@ require "logger"
 
 module Schked
   class Config
-    attr_writer :logger
+    attr_writer :logger,
+      :do_not_load_root_schedule
 
     def paths
       @paths ||= []
@@ -16,6 +17,10 @@ module Schked
 
     def logger
       @logger ||= Logger.new($stdout).tap { |l| l.level = Logger::INFO }
+    end
+
+    def do_not_load_root_schedule?
+      !!@do_not_load_root_schedule
     end
 
     def register_callback(name, &block)

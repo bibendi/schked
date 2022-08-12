@@ -6,7 +6,10 @@ module Schked
   class Railtie < Rails::Railtie
     class PathsConfig
       def self.call(app)
-        if (root_schedule = app.root.join("config", "schedule.rb")).exist?
+        return if Schked.config.do_not_load_root_schedule?
+
+        root_schedule = app.root.join("config", "schedule.rb")
+        if root_schedule.exist?
           path = root_schedule.to_s
           Schked.config.paths << path unless Schked.config.paths.include?(path)
         end
