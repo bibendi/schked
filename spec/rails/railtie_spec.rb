@@ -4,7 +4,11 @@ require "rails_helper"
 
 describe Schked::Railtie do
   describe "schked.config" do
-    subject(:config) { Schked.config }
+    let(:config) { Schked::Config.new }
+
+    before do
+      allow(Schked).to receive(:config).and_return(config)
+    end
 
     context "when by default root schedule doesn't exist" do
       it { expect(config.paths).to be_empty }
@@ -34,6 +38,14 @@ describe Schked::Railtie do
         it "does not add it twice" do
           initializer.call(double("app", root: Rails.root))
           expect(config.paths).to match_array([schedule_path])
+        end
+      end
+
+      context "when passed do_not_load_root_schedule config option" do
+        before { config.do_not_load_root_schedule = true }
+
+        it "doesn't add root schedule to paths" do
+          expect(config.paths).to be_empty
         end
       end
     end
