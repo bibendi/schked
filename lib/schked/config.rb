@@ -5,7 +5,8 @@ require "logger"
 module Schked
   class Config
     attr_writer :logger,
-      :do_not_load_root_schedule
+      :do_not_load_root_schedule,
+      :redis_servers
 
     def paths
       @paths ||= []
@@ -31,6 +32,10 @@ module Schked
       callbacks[name].each do |callback|
         callback.call(*args)
       end
+    end
+
+    def redis_servers
+      @redis_servers ||= [ENV["REDIS_URL"]]
     end
 
     private

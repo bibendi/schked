@@ -7,9 +7,12 @@ module Schked
     def initialize(config:)
       @config = config
 
-      @scheduler = Rufus::Scheduler.new
+      @locker = RedisLocker.new(config.redis_servers, lock_ttl: 40_000)
+      @scheduler = Rufus::Scheduler.new(trigger_lock: locker)
 
+      watch_signals
       define_callbacks
+      define_extend_lock
       load_schedule
     end
 
@@ -38,7 +41,7 @@ module Schked
 
     private
 
-    attr_reader :config, :scheduler
+    attr_reader :config, :scheduler, :locker
 
     def define_callbacks
       cfg = config
@@ -60,6 +63,31 @@ module Schked
         cfg.logger.info("Finished task: #{job.opts[:as] || job.job_id}")
 
         cfg.fire_callback(:after_finish, job, time)
+      end
+    end
+
+    def watch_signals
+      Signal.trap("TERM") do
+        config.logger.info("Going to shut down...")
+        @shutdown = true
+      end
+
+      Signal.trap("INT") do
+        config.logger.info("Going to shut down...")
+        @shutdown = true
+      end
+
+      Thread.new do
+        loop do
+          scheduler.shutdown(wait: 5) if @shutdown
+          sleep 0.2
+        end
+      end
+    end
+
+    def define_extend_lock
+      scheduler.every("10s", as: "Schked::Worker#extend_lock", timeout: "5s", overlap: false) do
+        locker.extend_lock
       end
     end
 
