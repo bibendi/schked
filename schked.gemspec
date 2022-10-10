@@ -4,7 +4,6 @@ lib = File.expand_path("lib", __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "schked/version"
 
-# rubocop:disable Metrics/BlockLength
 Gem::Specification.new do |s|
   s.name = "schked"
   s.version = Schked::VERSION
@@ -30,6 +29,7 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.required_ruby_version = "> 2.5"
 
+  s.add_dependency "redlock"
   s.add_dependency "rufus-scheduler", "~> 3.0"
   s.add_dependency "thor"
 
@@ -41,4 +41,3 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rspec", "~> 3.9"
   s.add_development_dependency "standard", "~> 0.4"
 end
-# rubocop:enable Metrics/BlockLength

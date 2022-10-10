@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "redlock"
+
 require "schked/version"
 require "schked/config"
 require "schked/worker"
+require "schked/redis_locker"
 require "schked/railtie" if defined?(Rails)
 
 module Schked

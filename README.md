@@ -41,7 +41,7 @@ gem install schked
 config/schedule.rb
 
 ```ruby
-cron "*/30 * * * *", as: "CleanOrphanAttachmentsJob" do
+cron "*/30 * * * *", as: "CleanOrphanAttachmentsJob", timeout: "60s", overlap: false do
   CleanOrphanAttachmentsJob.perform_later
 end
 ```
@@ -70,6 +70,16 @@ To show schedule:
 
 ```sh
 bundle exec schked show
+```
+
+### Duplicate scheduling
+
+When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked is using Redis for locks.
+
+You can configure Redis client as the following:
+
+```ruby
+Schked.config.redis_servers = ["redis://127.0.0.1:7777", "redis://127.0.0.1:7778", "redis://127.0.0.1:7779"]
 ```
 
 ### Callbacks
