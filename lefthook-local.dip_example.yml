@@ -1,4 +1,4 @@
 pre-commit:
   commands:
     rubocop:
-      runner: dip {cmd}
+      run: dip {cmd}
