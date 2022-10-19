@@ -15,4 +15,15 @@ describe Schked::Config do
   end
 
   it { expect(config.logger).to be_a(Logger) }
+
+  it { expect(config).to be_standalone }
+
+  context "when RACK_ENV=production" do
+    it "is not standalone" do
+      old_val = ENV["RACK_ENV"]
+      ENV["RACK_ENV"] = "production"
+      expect(config).not_to be_standalone
+      ENV["RACK_ENV"] = old_val
+    end
+  end
 end

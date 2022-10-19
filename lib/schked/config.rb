@@ -6,7 +6,8 @@ module Schked
   class Config
     attr_writer :logger,
       :do_not_load_root_schedule,
-      :redis_servers
+      :redis_servers,
+      :standalone
 
     def paths
       @paths ||= []
@@ -35,7 +36,13 @@ module Schked
     end
 
     def redis_servers
-      @redis_servers ||= [ENV["REDIS_URL"]]
+      @redis_servers ||= [ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379")]
+    end
+
+    def standalone?
+      @standalone = ENV["RAILS_ENV"] == "test" || ENV["RACK_ENV"] == "test" if @standalone.nil?
+
+      !!@standalone
     end
 
     private

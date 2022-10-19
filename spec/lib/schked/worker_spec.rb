@@ -44,6 +44,8 @@ describe Schked::Worker do
   describe "start" do
     it "starts rufus scheduler" do
       expect_any_instance_of(Rufus::Scheduler).to receive(:join)
+      expect(Schked::RedisLocker).not_to receive(:new)
+      expect_any_instance_of(described_class).not_to receive(:define_extend_lock)
 
       worker.wait
     end
@@ -67,6 +69,18 @@ describe Schked::Worker do
       expect(logger).to have_received(:fatal).with(/Task test_task failed with error: Boom/)
       expect(logger).to have_received(:error)
       expect(logger).to have_received(:info).with(/Finished task: test_task/)
+    end
+  end
+
+  describe "when is not standalone" do
+    let(:config) { Schked::Config.new.tap { |x| x.standalone = false } }
+
+    it "starts rufus scheduler" do
+      expect_any_instance_of(Rufus::Scheduler).to receive(:join)
+      expect(Schked::RedisLocker).to receive(:new).and_call_original
+      expect_any_instance_of(described_class).to receive(:define_extend_lock).and_call_original
+
+      worker.wait
     end
   end
 end
