@@ -1,4 +1,4 @@
-#!/usr/bun/ruby
+#!/usr/bin/ruby
 # frozen_string_literal: true
 
 require "bundler/setup"

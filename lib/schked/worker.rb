@@ -47,7 +47,12 @@ module Schked
       cfg = config
 
       scheduler.define_singleton_method(:on_error) do |job, error|
-        cfg.logger.fatal("Task #{job.opts[:as] || job.job_id} failed with error: #{error.message}")
+        name = if job
+          job.opts[:as] || job.job_id
+        else
+          "unknown"
+        end
+        cfg.logger.fatal("Task #{name} failed with error: #{error.message}")
         cfg.logger.error(error.backtrace.join("\n")) if error.backtrace
 
         cfg.fire_callback(:on_error, job, error)
