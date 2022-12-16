@@ -7,7 +7,7 @@ module Schked
     def initialize(config:)
       @config = config
 
-      @locker = RedisLocker.new(config.redis_servers, lock_ttl: 40_000) unless config.standalone?
+      @locker = RedisLocker.new(config.redis_servers, lock_ttl: 40_000, logger: config.logger) unless config.standalone?
       @scheduler = Rufus::Scheduler.new(trigger_lock: locker)
 
       watch_signals
@@ -46,26 +46,29 @@ module Schked
     def define_callbacks
       cfg = config
 
-      scheduler.define_singleton_method(:on_error) do |job, error|
-        name = if job
+      scheduler.define_singleton_method(:extract_job_name) do |job|
+        if job
           job.opts[:as] || job.job_id
         else
           "unknown"
         end
-        cfg.logger.fatal("Task #{name} failed with error: #{error.message}")
+      end
+
+      scheduler.define_singleton_method(:on_error) do |job, error|
+        cfg.logger.fatal("Task #{extract_job_name(job)} failed with error: #{error.message}")
         cfg.logger.error(error.backtrace.join("\n")) if error.backtrace
 
         cfg.fire_callback(:on_error, job, error)
       end
 
       scheduler.define_singleton_method(:on_pre_trigger) do |job, time|
-        cfg.logger.info("Started task: #{job.opts[:as] || job.job_id}")
+        cfg.logger.info("Started task: #{extract_job_name(job)}")
 
         cfg.fire_callback(:before_start, job, time)
       end
 
       scheduler.define_singleton_method(:on_post_trigger) do |job, time|
-        cfg.logger.info("Finished task: #{job.opts[:as] || job.job_id}")
+        cfg.logger.info("Finished task: #{extract_job_name(job)}")
 
         cfg.fire_callback(:after_finish, job, time)
       end
@@ -85,7 +88,7 @@ module Schked
       Thread.new do
         loop do
           scheduler.shutdown(wait: 5) if @shutdown
-          sleep 0.2
+          sleep 1
         end
       end
     end
