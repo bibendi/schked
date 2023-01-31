@@ -12,17 +12,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # waiting for the fix https://github.com/thoughtbot/appraisal/issues/186 to test on Ruby 3
-        ruby: [ '2.6', '2.7' ]
+        # waiting for the release with the fix for https://github.com/thoughtbot/appraisal/issues/199 to test on Ruby 3.2
+        ruby: [ '2.6', '2.7', '3.0', '3.1' ]
     env:
       RUBY_IMAGE: ${{ matrix.ruby }}
     name: Ruby ${{ matrix.ruby }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.0
+          ruby-version: '3.0' 
       - name: Install dependencies
         run: |
           gem install dip
