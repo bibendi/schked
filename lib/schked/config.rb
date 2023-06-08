@@ -35,6 +35,19 @@ module Schked
       end
     end
 
+    def fire_around_callback(name, job, calls = callbacks[name], &block)
+      return yield if calls.none?
+
+      calls.first.call(job) do
+        calls = calls.drop(1)
+        if calls.any?
+          fire_around_callback(name, job, calls, &block)
+        else
+          yield
+        end
+      end
+    end
+
     def redis_servers
       @redis_servers ||= [ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379")]
     end
