@@ -70,6 +70,130 @@ describe Schked::Worker do
       expect(logger).to have_received(:error)
       expect(logger).to have_received(:info).with(/Finished task: test_task/)
     end
+
+    context "when there are no registered callbacks" do
+      specify do
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect_any_instance_of(Schked::Worker)
+          .to receive(:schedule)
+          .and_return("self.in('0s', as: :test_task) { logger.info('inside job') }")
+
+        expect(logger).to receive(:info).with(/Started task: test_task/).ordered
+        expect(logger).to receive(:info).with(/inside job/).ordered
+        expect(logger).to receive(:info).with(/Finished task: test_task/).ordered
+
+        worker
+
+        sleep 0.5
+      end
+    end
+
+    context "when there are registered around_job callbacks" do
+      specify "single callback" do
+        counter = 0
+        config.register_callback(:around_job) do |_job, &block|
+          logger.info("callback before")
+          counter += 1
+          block.call
+          counter += 1
+          logger.info("callback after")
+        end
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect_any_instance_of(Schked::Worker)
+          .to receive(:schedule)
+          .and_return("self.in('0s', as: :test_task) { logger.info('inside job') }")
+
+        expect(logger).to receive(:info).with(/Started task: test_task/).ordered
+        expect(logger).to receive(:info).with(/callback before/).ordered
+        expect(logger).to receive(:info).with(/inside job/).ordered
+        expect(logger).to receive(:info).with(/callback after/).ordered
+        expect(logger).to receive(:info).with(/Finished task: test_task/).ordered
+
+        worker
+
+        sleep 0.5
+
+        expect(counter).to eq 2
+      end
+
+      specify "multiple callbacks" do
+        counter = 0
+
+        config.register_callback(:around_job) do |_job, &block|
+          logger.info("callback 1 before")
+          counter += 1
+          block.call
+          counter += 1
+          logger.info("callback 1 after")
+        end
+
+        config.register_callback(:around_job) do |_job, &block|
+          logger.info("callback 2 before")
+          counter += 1
+          block.call
+          counter += 1
+          logger.info("callback 2 after")
+        end
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect_any_instance_of(Schked::Worker)
+          .to receive(:schedule)
+          .and_return("self.in('0s', as: :test_task) { logger.info('inside job') }")
+
+        expect(logger).to receive(:info).with(/Started task: test_task/).ordered
+        expect(logger).to receive(:info).with(/callback 1 before/).ordered
+        expect(logger).to receive(:info).with(/callback 2 before/).ordered
+        expect(logger).to receive(:info).with(/inside job/).ordered
+        expect(logger).to receive(:info).with(/callback 2 after/).ordered
+        expect(logger).to receive(:info).with(/callback 1 after/).ordered
+        expect(logger).to receive(:info).with(/Finished task: test_task/).ordered
+
+        worker
+
+        sleep 0.5
+
+        expect(counter).to eq 4
+      end
+    end
+
+    context "when there are multiple around_job callbacks" do
+      it "persists callbacks between jobs" do
+        counter = 0
+        config.register_callback(:around_job) do |job, &block|
+          logger.info("callback before - #{job.opts[:as]}")
+          counter += 1
+          block.call
+          counter += 1
+          logger.info("callback after - #{job.opts[:as]}")
+        end
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect_any_instance_of(Schked::Worker)
+          .to receive(:schedule)
+          .and_return(
+            "self.in('0s', as: :test_task_1) { logger.info('inside job 1') };" \
+            "self.in('0.1s', as: :test_task_2) { logger.info('inside job 2') }"
+          )
+
+        expect(logger).to receive(:info).with(/Started task: test_task_1/).ordered
+        expect(logger).to receive(:info).with(/callback before - test_task_1/).ordered
+        expect(logger).to receive(:info).with(/inside job 1/).ordered
+        expect(logger).to receive(:info).with(/callback after - test_task_1/).ordered
+        expect(logger).to receive(:info).with(/Finished task: test_task_1/).ordered
+        expect(logger).to receive(:info).with(/Started task: test_task_2/).ordered
+        expect(logger).to receive(:info).with(/callback before - test_task_2/).ordered
+        expect(logger).to receive(:info).with(/inside job 2/).ordered
+        expect(logger).to receive(:info).with(/callback after - test_task_2/).ordered
+        expect(logger).to receive(:info).with(/Finished task: test_task_2/).ordered
+
+        worker
+
+        sleep 0.5
+
+        expect(counter).to eq 4
+      end
+    end
   end
 
   describe "when is not standalone" do

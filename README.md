@@ -94,7 +94,19 @@ Schked.config.register_callback(:on_error) do |job, error|
 end
 ```
 
-There are `:before_start` and `:after_finish` callbacks as well.
+There are `:before_start`, `:after_finish` and `:around_job` callbacks as well.
+
+Warning: `:before_start` and `:after_finish` callbacks are executed in the scheduler thread, not in the work threads (the threads where the job execution really happens).
+
+`:around_job` callback is executed in the job's thread.
+
+```ruby
+Schked.config.register_callback(:around_job) do |job, &block|
+  ...
+  block.call
+  ...
+end
+```
 
 ### Logging
 

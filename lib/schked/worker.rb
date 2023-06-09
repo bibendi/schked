@@ -67,6 +67,10 @@ module Schked
         cfg.fire_callback(:before_start, job, time)
       end
 
+      scheduler.define_singleton_method(:around_trigger) do |job, &block|
+        cfg.fire_around_callback(:around_job, job, &block)
+      end
+
       scheduler.define_singleton_method(:on_post_trigger) do |job, time|
         cfg.logger.info("Finished task: #{extract_job_name(job)}")
 
