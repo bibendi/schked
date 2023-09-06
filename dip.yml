@@ -34,6 +34,10 @@ interaction:
         default_args: spec/lib
         command: bundle exec appraisal agnostic bundle exec rspec
 
+      redlock.1:
+        default_args: spec/lib
+        command: bundle exec appraisal redlock.1 bundle exec rspec
+
       rails:
         default_args: spec/rails
         command: bundle exec appraisal bundle exec rspec

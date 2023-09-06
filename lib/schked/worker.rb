@@ -7,7 +7,8 @@ module Schked
     def initialize(config:)
       @config = config
 
-      @locker = RedisLocker.new(config.redis_servers, lock_ttl: 40_000, logger: config.logger) unless config.standalone?
+      @locker = RedisLocker.new(config.redis, lock_ttl: 40_000, logger: config.logger) unless config.standalone?
+
       @scheduler = Rufus::Scheduler.new(trigger_lock: locker)
 
       watch_signals

@@ -3,7 +3,6 @@
 ENV["RAILS_ENV"] = "test"
 
 require "bundler/setup"
-require "pry-byebug"
 require "combustion"
 
 Combustion.initialize!

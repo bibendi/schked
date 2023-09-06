@@ -3,9 +3,7 @@
 ENV["RACK_ENV"] = "test"
 
 require "bundler/setup"
-require "pry-byebug"
 require "schked"
-require "redis"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -17,7 +15,8 @@ RSpec.configure do |config|
 
   config.filter_run_when_matching :focus
 
+  redis = RedisClient.new(url: ENV["REDIS_URL"])
   config.before(:each) do
-    Redis.new(url: ENV["REDIS_URL"]).flushdb
+    redis.call("FLUSHDB")
   end
 end

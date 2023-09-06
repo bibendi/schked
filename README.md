@@ -79,7 +79,7 @@ When you deploy your schedule to production, you want to start new instance befo
 You can configure Redis client as the following:
 
 ```ruby
-Schked.config.redis_servers = ["redis://127.0.0.1:7777", "redis://127.0.0.1:7778", "redis://127.0.0.1:7779"]
+Schked.config.redis = {url: ENV.fetch("REDIS_URL") }
 ```
 
 ### Callbacks
