@@ -15,10 +15,8 @@ appraise "rails.6" do
   gem "rails", "~> 6"
 end
 
-if RUBY_VERSION > "2.6"
-  appraise "rails.7" do
-    gem "rails", "~> 7"
-  end
+appraise "rails.7" do
+  gem "rails", "~> 7"
 end
 
 appraise "redlock.1" do

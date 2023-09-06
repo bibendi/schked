@@ -27,7 +27,7 @@ Gem::Specification.new do |s|
   s.bindir = "exe"
   s.executables = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
-  s.required_ruby_version = "> 2.5"
+  s.required_ruby_version = ">= 2.7"
 
   s.add_dependency "connection_pool", "~> 2.0"
   s.add_dependency "redlock", "> 1.0", "< 3.0"
