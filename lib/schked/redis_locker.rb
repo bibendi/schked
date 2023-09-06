@@ -10,8 +10,8 @@ module Schked
     LOCK_KEY = "schked:redis_locker"
     LOCK_TTL = 60_000 # ms
 
-    def initialize(redis_servers, lock_ttl: LOCK_TTL, logger: Logger.new($stdout))
-      @lock_manager = Redlock::Client.new(redis_servers, retry_count: 0)
+    def initialize(redis_conf, lock_ttl: LOCK_TTL, logger: Logger.new($stdout))
+      @lock_manager = Redlock::Client.new([redis_client(redis_conf)], retry_count: 0)
       @lock_ttl = lock_ttl
       @logger = logger
     end
@@ -48,6 +48,14 @@ module Schked
     end
 
     private
+
+    def redis_client(redis_conf)
+      if Gem::Version.new(Redlock::VERSION) >= Gem::Version.new("2.0.0")
+        ConnectionPool::Wrapper.new { RedisClientFactory.build(redis_conf) }
+      else
+        ConnectionPool::Wrapper.new { Redis.new(**redis_conf) }
+      end
+    end
 
     def try_lock
       @lock_id = lock_manager.lock(LOCK_KEY, lock_ttl)

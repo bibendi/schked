@@ -6,7 +6,7 @@ module Schked
   class Config
     attr_writer :logger,
       :do_not_load_root_schedule,
-      :redis_servers,
+      :redis,
       :standalone
 
     def paths
@@ -48,8 +48,23 @@ module Schked
       end
     end
 
-    def redis_servers
-      @redis_servers ||= [ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379")]
+    def redis
+      @redis ||= {url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379")}
+    end
+
+    def redis_servers=(val)
+      val = val.first
+
+      if val.is_a?(String)
+        self.redis = {url: val}
+      elsif val.respond_to?(:_client)
+        conf = val._client.config
+        self.redis = {url: conf.server_url, username: conf.username, password: conf.password}
+      else
+        raise ArgumentError, "Schked `redis_servers=` config option is deprecated. Please use `redis=` with a Hash"
+      end
+
+      warn "🔥 Schked `redis_servers=` config option is deprecated. Please use `redis=` with a Hash. Called from #{caller(1..1).first}"
     end
 
     def standalone?

@@ -29,16 +29,16 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.required_ruby_version = "> 2.5"
 
-  s.add_dependency "redlock"
+  s.add_dependency "connection_pool", "~> 2.0"
+  s.add_dependency "redlock", "> 1.0", "< 3.0"
   s.add_dependency "rufus-scheduler", "~> 3.0"
   s.add_dependency "thor"
 
   s.add_development_dependency "appraisal", "~> 2.2"
   s.add_development_dependency "bundler", ">= 1.16"
   s.add_development_dependency "combustion", "~> 1.3"
-  s.add_development_dependency "pry-byebug", "~> 3.9"
   s.add_development_dependency "rake", "~> 13.0"
-  s.add_development_dependency "redis", "~> 5.0"
+  s.add_development_dependency "redis-client", "~> 0.10"
   s.add_development_dependency "rspec", "~> 3.9"
   s.add_development_dependency "standard", "~> 0.4"
 end

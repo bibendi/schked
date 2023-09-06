@@ -3,8 +3,9 @@
 require "spec_helper"
 
 describe Schked::RedisLocker do
-  let(:redis_servers) { [ENV["REDIS_URL"]] }
-  subject { described_class.new(redis_servers) }
+  let(:redis_conf) { {url: ENV["REDIS_URL"]} }
+
+  subject { described_class.new(redis_conf) }
 
   describe "#lock" do
     it "locks" do
@@ -13,7 +14,7 @@ describe Schked::RedisLocker do
 
     context "when is locked by someone else" do
       before do
-        described_class.new(redis_servers).lock
+        described_class.new(redis_conf).lock
       end
 
       it "fails to lock" do
@@ -45,7 +46,7 @@ describe Schked::RedisLocker do
 
     context "when is locked by someone else" do
       before do
-        described_class.new(redis_servers).lock
+        described_class.new(redis_conf).lock
       end
 
       it "fails to unlock" do
@@ -55,7 +56,7 @@ describe Schked::RedisLocker do
   end
 
   describe "#extend_lock" do
-    subject { described_class.new(redis_servers, lock_ttl: 1000) }
+    subject { described_class.new(redis_conf, lock_ttl: 1000) }
 
     context "when is locked by us" do
       it "extends lock" do
@@ -71,7 +72,7 @@ describe Schked::RedisLocker do
 
     context "when is locked by someone else" do
       before do
-        described_class.new(redis_servers, lock_ttl: 1000).lock
+        described_class.new(redis_conf, lock_ttl: 1000).lock
       end
 
       it "fails to extend" do
