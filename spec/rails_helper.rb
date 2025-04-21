@@ -3,6 +3,7 @@
 ENV["RAILS_ENV"] = "test"
 
 require "bundler/setup"
+require "logger"
 require "combustion"
 
 Combustion.initialize!
