@@ -34,6 +34,7 @@ describe Schked::Worker do
           bar.flush
 
           config.paths << bar.path
+          config.paths << bar.path # add duplicate path to ensure it will be ignored"
 
           expect(worker.schedule).to eq "every('100d') { puts 'foo' }\nevery('200d') { puts 'bar' }"
         end

@@ -36,6 +36,8 @@ module Schked
     def schedule
       config
         .paths
+        .map { |path| File.expand_path(path) }
+        .uniq
         .map { |path| File.read(path) }
         .join("\n")
     end
