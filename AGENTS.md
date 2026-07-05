@@ -18,7 +18,7 @@ dip rspec rails      # Rails integration tests (spec/rails)
 dip rspec redlock.1  # redlock 1.x compatibility tests
 ```
 
-CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `rspec redlock.1`.
+CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `rspec redlock.1`. Rails 8 is tested only on Ruby 3.2+.
 
 ## Tooling
 

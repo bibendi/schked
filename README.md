@@ -32,7 +32,7 @@ gem install schked
 
 Schked requires **Ruby 2.7+**.
 
-The test matrix covers Ruby **2.7, 3.0, 3.1, 3.2, 3.3, 3.4, and 4.0**, and Rails **6, 7, and 8** (Rails 8 is tested on Ruby 3.2+).
+The test matrix covers Ruby **2.7, 3.0, 3.1, 3.2, 3.3, 3.4, and 4.0**. Rails integration tests run on every Ruby; Rails 8 is only included on Ruby **3.2+**.
 
 ## Usage
 
