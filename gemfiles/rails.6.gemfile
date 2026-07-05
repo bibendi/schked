@@ -3,5 +3,9 @@
 source "https://rubygems.org"
 
 gem "rails", "~> 6"
+gem "benchmark"
+gem "bigdecimal"
+gem "mutex_m"
+gem "tsort"
 
 gemspec path: "../"
