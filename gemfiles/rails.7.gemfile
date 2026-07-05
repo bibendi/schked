@@ -3,5 +3,7 @@
 source "https://rubygems.org"
 
 gem "rails", "~> 7"
+gem "bigdecimal"
+gem "mutex_m"
 
 gemspec path: "../"

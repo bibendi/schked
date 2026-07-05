@@ -22,7 +22,7 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 
 ## Tooling
 
-- **Ruby:** supports `>= 2.7`; CI tests `2.7`, `3.0`, `3.1`, `3.2`.
+- **Ruby:** supports `>= 2.7`; CI tests `2.7`, `3.0`, `3.1`, `3.2`, `3.3`, `3.4`, `4.0`.
 - **Linter:** [StandardRB](https://github.com/standardrb/standard) (configured in `.standard.yml`). Run with `dip standardrb` or `bundle exec standardrb`.
 - **Pre-commit:** `lefthook.yml` runs `bundle exec standardrb --fix {staged_files}`.
 - **Multi-version testing:** [Appraisal](https://github.com/thoughtbot/appraisal) generates gemfiles under `gemfiles/` from `Appraisals`. Regenerate with `dip appraisal install` after changing `Appraisals`.
@@ -43,7 +43,7 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 - Redis is required for tests. `spec_helper.rb` flushes the DB before each example using `ENV["REDIS_URL"]`.
 - In test environments, `Config#standalone?` defaults to `true`, so Redis locking is disabled unless explicitly set to `false`.
 - To run a single spec file locally without Docker: `bundle exec rspec spec/lib/schked/worker_spec.rb`.
-- To run against a specific appraisal gemfile: `bundle exec appraisal rails.7 bundle exec rspec spec/rails`.
+- To run against a specific appraisal gemfile: `bundle exec appraisal rails.8 bundle exec rspec spec/rails`.
 
 ## Runtime behavior
 

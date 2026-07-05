@@ -16,3 +16,24 @@
 
 .lefthook-local/
 lefthook-local.yml
+
+# Logs and temp files
+/log/*.log
+*.log
+*.tmp
+*.swp
+
+# Built gems
+*.gem
+
+# Vendor bundles
+vendor/bundle/
+
+# Editor and OS metadata
+.DS_Store
+.vscode/
+.idea/
+
+# Speckit feature artifacts
+.specify/feature.json
+specs/
