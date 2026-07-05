@@ -4,6 +4,7 @@ require "connection_pool"
 require "redlock"
 
 require "schked/version"
+require "schked/liveness_probe"
 require "schked/config"
 require "schked/worker"
 require "schked/redis_locker"

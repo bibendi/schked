@@ -2,12 +2,20 @@
 
 require "spec_helper"
 require "tempfile"
+require "socket"
 
 describe Schked::Worker do
   subject(:worker) { described_class.new(config: config) }
 
   let(:config) { Schked::Config.new }
   let(:logger) { instance_double(Logger).as_null_object }
+
+  def available_port
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.addr[1]
+    server.close
+    port
+  end
 
   before do
     @taoe = Thread.abort_on_exception
@@ -206,6 +214,55 @@ describe Schked::Worker do
       expect_any_instance_of(described_class).to receive(:define_extend_lock).and_call_original
 
       worker.wait
+    end
+  end
+
+  describe "liveness probe" do
+    context "when enabled" do
+      let(:config) { Schked::Config.new.tap { |x| x.liveness_probe = {enabled: true, bind: "127.0.0.1", port: available_port} } }
+
+      it "starts the probe after the schedule is loaded" do
+        worker
+
+        probe = worker.send(:liveness_probe)
+        expect(probe).to be_a(Schked::LivenessProbe)
+        expect(probe.send(:instance_variable_get, :@server)).to be_a(TCPServer)
+      end
+
+      it "stops the probe on shutdown" do
+        worker
+
+        probe = worker.send(:liveness_probe)
+        worker.stop
+
+        expect(probe.send(:instance_variable_get, :@thread)).not_to be_alive
+      end
+    end
+
+    context "when disabled" do
+      let(:config) { Schked::Config.new }
+
+      it "does not instantiate a LivenessProbe" do
+        expect(Schked::LivenessProbe).not_to receive(:new)
+
+        worker
+      end
+
+      it "runs scheduled jobs normally" do
+        Tempfile.open("schedule") do |file|
+          file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"
+          file.flush
+
+          config.paths << file.path
+
+          allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+          expect(logger).to receive(:info).with(/inside job/)
+
+          worker
+
+          sleep 0.5
+        end
+      end
     end
   end
 end

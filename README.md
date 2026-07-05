@@ -124,6 +124,54 @@ config/initializers/schked.rb
 Schked.config.logger = Logger.new(Rails.root.join("log", "schked.log"))
 ```
 
+### Liveness probe
+
+Schked can expose a small HTTP endpoint for Kubernetes liveness probes. It is **disabled by default** to keep the existing behavior unchanged.
+
+Configure it in Ruby:
+
+```ruby
+Schked.config.liveness_probe = {
+  enabled: true,
+  bind: "0.0.0.0",
+  port: 8080,
+  path: "/healthz",
+  heartbeat_interval: 5,
+  heartbeat_threshold: 15
+}
+```
+
+Or via CLI flags:
+
+```sh
+bundle exec schked start --liveness-probe --liveness-bind 0.0.0.0 --liveness-port 8080 --liveness-path /healthz
+```
+
+In Rails, set it through the application config:
+
+```ruby
+# config/application.rb or config/environments/*.rb
+config.schked.liveness_probe = {
+  enabled: true,
+  bind: "0.0.0.0",
+  port: 8080,
+  path: "/healthz",
+  heartbeat_interval: 5,
+  heartbeat_threshold: 15
+}
+```
+
+The endpoint returns `200 OK` while the scheduler is responsive and `503 Service Unavailable` when the heartbeat is stale or during shutdown. The scheduler updates the heartbeat every `heartbeat_interval` seconds (default `5`); if it is not updated within `heartbeat_threshold` seconds (default `15`), the endpoint reports unhealthy. Use it in Kubernetes like this:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+```
+
 ### Monitoring
 
 [Yabeda::Schked](https://github.com/yabeda-rb/yabeda-schked) - built-in metrics for monitoring Schked recurring jobs out of the box! Part of the [yabeda](https://github.com/yabeda-rb/yabeda) suite.

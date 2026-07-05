@@ -6,6 +6,7 @@ module Schked
   class Worker
     def initialize(config:)
       @config = config
+      @liveness_probe = nil
 
       @locker = RedisLocker.new(config.redis, lock_ttl: 40_000, logger: config.logger) unless config.standalone?
 
@@ -15,6 +16,7 @@ module Schked
       define_callbacks
       define_extend_lock unless config.standalone?
       load_schedule
+      start_liveness_probe
     end
 
     def job(as)
@@ -30,6 +32,7 @@ module Schked
     end
 
     def stop
+      liveness_probe&.stop
       scheduler.stop
     end
 
@@ -44,7 +47,7 @@ module Schked
 
     private
 
-    attr_reader :config, :scheduler, :locker
+    attr_reader :config, :scheduler, :locker, :liveness_probe
 
     def define_callbacks
       cfg = config
@@ -94,7 +97,10 @@ module Schked
 
       Thread.new do
         loop do
-          scheduler.shutdown(wait: 5) if @shutdown
+          if @shutdown
+            liveness_probe&.stop
+            scheduler.shutdown(wait: 5)
+          end
           sleep 1
         end
       end
@@ -108,6 +114,19 @@ module Schked
 
     def load_schedule
       scheduler.instance_eval(schedule)
+    end
+
+    def start_liveness_probe
+      return unless config.liveness_probe.enabled
+
+      @liveness_probe = LivenessProbe.new(config: config.liveness_probe, logger: config.logger)
+      @liveness_probe.start
+
+      scheduler.every("#{config.liveness_probe.heartbeat_interval}s", as: "Schked::Worker#liveness_heartbeat", overlap: false) do
+        @liveness_probe.heartbeat
+      end
+
+      @liveness_probe.heartbeat
     end
   end
 end

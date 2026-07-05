@@ -15,6 +15,7 @@ Schked is a framework-agnostic Ruby wrapper around [rufus-scheduler](https://git
 | How do I install and configure it? | `references/initialization.md` |
 | What changed between versions or what is deprecated? | `references/migration.md` |
 | How do I perform a concrete task? | `references/recipes/{use-case}.md` |
+| How do I configure the Kubernetes liveness probe? | `references/recipes/configure-liveness-probe.md` |
 | What is broken and how do I fix it? | `references/troubleshooting.md` |
 
 ## Reading Order
