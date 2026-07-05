@@ -19,9 +19,11 @@ appraise "rails.7" do
   gem "mutex_m"
 end
 
-appraise "rails.8" do
-  gem "rails", "~> 8"
-  gem "bigdecimal"
+if RUBY_VERSION >= "3.2"
+  appraise "rails.8" do
+    gem "rails", "~> 8"
+    gem "bigdecimal"
+  end
 end
 
 appraise "redlock.1" do

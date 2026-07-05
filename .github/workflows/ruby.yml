@@ -32,7 +32,6 @@ jobs:
       - name: Run agnostic tests
         run: dip rspec agnostic
       - name: Run Rails tests
-        if: ${{ contains(fromJson('["3.2", "3.3", "3.4", "4.0"]'), matrix.ruby) }}
         run: dip rspec rails
       - name: Run Redlock tests
         run: dip rspec redlock.1
