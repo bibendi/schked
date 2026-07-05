@@ -1,6 +1,6 @@
 services:
   ruby:
-    image: ruby:${RUBY_IMAGE:-4.0}-bookworm
+    image: ruby:${RUBY_IMAGE:-4.0}-${RUBY_DIST:-bookworm}
     environment:
       - HISTFILE=/app/tmp/.bash_history
       - BUNDLE_PATH=/bundle
