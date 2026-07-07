@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.5.0] - 2026-07-08
 
-- Added optional Kubernetes liveness probe support. When enabled, Schked exposes a configurable HTTP `/healthz` endpoint that returns `200 OK` while healthy and `503 Service Unavailable` when the heartbeat is stale or during shutdown. Disabled by default; configurable via Ruby, CLI flags, or Rails application config.
+- Added optional Kubernetes liveness probe support. When enabled, Schked exposes a configurable HTTP `/healthz` endpoint that returns `200 OK` while healthy and `503 Service Unavailable` when the heartbeat is stale or during shutdown. Disabled by default; configurable via Ruby, CLI flags, or Rails application config. [#42]
 
 ## [1.4.0] - 2026-07-05
 
