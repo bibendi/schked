@@ -41,5 +41,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "redis-client", "~> 0.10"
   s.add_development_dependency "rspec", "~> 3.9"
   s.add_development_dependency "ostruct"
-  s.add_development_dependency "standard", "~> 0.4"
+  s.add_development_dependency "standard", "~> 1.37"
 end

@@ -15,7 +15,7 @@ module Schked
           .shellsplit
       end
 
-      super(argv)
+      super
     end
 
     def self.exit_on_failure?
