@@ -9,6 +9,14 @@ module Schked
       :redis,
       :standalone
 
+    def liveness_probe
+      @liveness_probe ||= LivenessProbeConfig.new
+    end
+
+    def liveness_probe=(value)
+      @liveness_probe = value.is_a?(LivenessProbeConfig) ? value : LivenessProbeConfig.new(value)
+    end
+
     def paths
       @paths ||= []
     end

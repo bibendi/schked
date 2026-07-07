@@ -29,6 +29,7 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.required_ruby_version = ">= 2.7"
 
+  s.add_dependency "logger"
   s.add_dependency "connection_pool", "~> 2.0"
   s.add_dependency "redlock", "> 1.0", "< 3.0"
   s.add_dependency "rufus-scheduler", "~> 3.0"

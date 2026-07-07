@@ -8,6 +8,11 @@ describe Schked::Railtie do
 
     before do
       allow(Schked).to receive(:config).and_return(config)
+      Rails.application.config.schked.liveness_probe = nil
+    end
+
+    after do
+      Rails.application.config.schked.liveness_probe = nil
     end
 
     context "when by default root schedule doesn't exist" do
@@ -47,6 +52,30 @@ describe Schked::Railtie do
         it "doesn't add root schedule to paths" do
           expect(config.paths).to be_empty
         end
+      end
+    end
+
+    context "when liveness_probe is configured" do
+      it "forwards liveness_probe config to Schked" do
+        initializer = Schked::Railtie::LivenessConfig
+
+        initializer.call(double("app", config: double("rails_config", schked: double("schked_config", liveness_probe: {enabled: true, bind: "127.0.0.1", port: 9090, path: "/ready"}))))
+
+        expect(config.liveness_probe.enabled).to be true
+        expect(config.liveness_probe.bind).to eq "127.0.0.1"
+        expect(config.liveness_probe.port).to eq 9090
+        expect(config.liveness_probe.path).to eq "/ready"
+      end
+    end
+
+    context "when liveness_probe is not configured" do
+      it "does not change Schked config" do
+        initializer = Schked::Railtie::LivenessConfig
+        original = config.liveness_probe
+
+        initializer.call(double("app", config: double("rails_config", schked: double("schked_config", liveness_probe: nil))))
+
+        expect(config.liveness_probe).to eq original
       end
     end
   end
