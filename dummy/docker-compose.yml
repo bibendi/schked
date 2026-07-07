@@ -1,0 +1,28 @@
+name: schked-dummy
+
+services:
+  scheduler:
+    image: ruby:4.0-slim
+    working_dir: /app
+    volumes:
+      # Dummy application sources
+      - .:/app
+      # Local schked gem (bind-mounted from the repo root)
+      - ../:/schked
+      # Cache installed gems between runs
+      - bundle_cache:/usr/local/bundle
+    entrypoint: /app/entrypoint.sh
+    command: ["bundle", "exec", "schked", "start"]
+    ports:
+      - "8080:8080"
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "ruby", "/app/healthcheck.rb"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  bundle_cache:
