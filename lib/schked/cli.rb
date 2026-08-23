@@ -47,6 +47,12 @@ module Schked
       puts "====="
     end
 
+    desc "generate-migration", "Print DDL SQL for the schked_job_runs table to stdout"
+    option :flavor, type: :string, default: "postgres", desc: "DDL flavor (postgres or mysql)"
+    def generate_migration(flavor = nil)
+      puts MigrationGenerator.sql(flavor || options[:flavor])
+    end
+
     private
 
     def load_requires

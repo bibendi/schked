@@ -57,4 +57,112 @@ describe Schked::Config do
         .to raise_error(ArgumentError, /port/)
     end
   end
+
+  describe "#dedup_enabled?" do
+    it "is false by default" do
+      expect(config.dedup_enabled?).to be false
+    end
+
+    it "is true when job_run_store is set to :redis" do
+      config.job_run_store = :redis
+      expect(config.dedup_enabled?).to be true
+    end
+
+    it "is true when job_run_store is set to :database" do
+      config.job_run_store = :database
+      expect(config.dedup_enabled?).to be true
+    end
+
+    it "is true when job_run_store is a custom object" do
+      custom = Object.new
+      config.job_run_store = custom
+      expect(config.dedup_enabled?).to be true
+    end
+  end
+
+  describe "#max_skew" do
+    it "defaults to 60" do
+      expect(config.max_skew).to eq 60
+    end
+
+    it "can be overridden" do
+      config.max_skew = 120
+      expect(config.max_skew).to eq 120
+    end
+  end
+
+  describe "#database_flavor" do
+    it "is nil by default" do
+      expect(config.database_flavor).to be_nil
+    end
+
+    it "can be set to :postgres" do
+      config.database_flavor = :postgres
+      expect(config.database_flavor).to eq :postgres
+    end
+
+    it "can be set to :mysql" do
+      config.database_flavor = :mysql
+      expect(config.database_flavor).to eq :mysql
+    end
+  end
+
+  describe "#database_connection" do
+    it "is nil by default" do
+      expect(config.database_connection).to be_nil
+    end
+
+    it "can be set to an object" do
+      conn = Object.new
+      config.database_connection = conn
+      expect(config.database_connection).to be conn
+    end
+  end
+
+  describe "#validate!" do
+    it "passes for default configuration" do
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "passes for :redis job_run_store" do
+      config.job_run_store = :redis
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "passes for :database job_run_store" do
+      config.job_run_store = :database
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "passes for a custom object responding to claim/cleanup" do
+      custom = double(claim: true, cleanup: nil)
+      config.job_run_store = custom
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "raises for an invalid symbol job_run_store" do
+      config.job_run_store = :something_invalid
+      expect { config.validate! }.to raise_error(ArgumentError, /job_run_store/)
+    end
+
+    it "raises for an object that doesn't respond to claim" do
+      config.job_run_store = Object.new
+      expect { config.validate! }.to raise_error(ArgumentError, /job_run_store/)
+    end
+
+    it "passes for :postgres database_flavor" do
+      config.database_flavor = :postgres
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "passes for :mysql database_flavor" do
+      config.database_flavor = :mysql
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it "raises for an invalid database_flavor" do
+      config.database_flavor = :sqlite
+      expect { config.validate! }.to raise_error(ArgumentError, /database_flavor/)
+    end
+  end
 end

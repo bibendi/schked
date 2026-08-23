@@ -6,6 +6,8 @@ services:
       - BUNDLE_PATH=/bundle
       - BUNDLE_CONFIG=/app/.bundle/config
       - REDIS_URL=redis://redis:6379/0
+      - SCHKED_POSTGRES_URL=postgres://schked:schked@postgres:5432/schked
+      - SCHKED_MYSQL_URL=mysql2://schked:schked@mysql:3306/schked
     command: bash
     working_dir: /app
     volumes:
@@ -16,12 +18,39 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
 
   redis:
     image: redis:7
     healthcheck:
       test: redis-cli ping
       interval: 10s
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=schked
+      - POSTGRES_PASSWORD=schked
+      - POSTGRES_DB=schked
+    healthcheck:
+      test: pg_isready -U schked -d schked
+      interval: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=schked
+      - MYSQL_USER=schked
+      - MYSQL_PASSWORD=schked
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u schked -pschked
+      interval: 5s
+      retries: 20
 
 volumes:
   bundler_data:

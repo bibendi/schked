@@ -11,21 +11,43 @@ appraise "rails.6" do
   gem "bigdecimal"
   gem "mutex_m"
   gem "tsort"
+  gem "pg", "~> 1.5"
 end
 
 appraise "rails.7" do
   gem "rails", "~> 7"
   gem "bigdecimal"
   gem "mutex_m"
+  gem "pg", "~> 1.5"
 end
 
 if RUBY_VERSION >= "3.2"
   appraise "rails.8" do
     gem "rails", "~> 8"
     gem "bigdecimal"
+    gem "pg", "~> 1.5"
   end
 end
 
 appraise "redlock.1" do
   gem "redlock", "~> 1.3"
+end
+
+if RUBY_VERSION >= "3.0"
+  appraise "postgres" do
+    gem "pg", "~> 1.5"
+  end
+end
+
+if RUBY_VERSION >= "3.0"
+  appraise "mysql" do
+    gem "mysql2", "~> 0.5"
+  end
+end
+
+if RUBY_VERSION >= "3.0"
+  appraise "sequel" do
+    gem "sequel", "~> 5.0"
+    gem "pg", "~> 1.5"
+  end
 end

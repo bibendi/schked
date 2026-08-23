@@ -4,10 +4,17 @@ require "logger"
 
 module Schked
   class Config
+    VALID_DATABASE_FLAVORS = %i[postgres mysql].freeze
+    VALID_JOB_RUN_STORES = %i[redis database].freeze
+
     attr_writer :logger,
       :do_not_load_root_schedule,
       :redis,
-      :standalone
+      :standalone,
+      :job_run_store,
+      :max_skew,
+      :database_connection,
+      :database_flavor
 
     def liveness_probe
       @liveness_probe ||= LivenessProbeConfig.new
@@ -79,6 +86,55 @@ module Schked
       @standalone = ENV["RAILS_ENV"] == "test" || ENV["RACK_ENV"] == "test" if @standalone.nil?
 
       !!@standalone
+    end
+
+    attr_reader :job_run_store
+
+    def max_skew
+      @max_skew ||= 60
+    end
+
+    attr_reader :database_flavor
+
+    attr_reader :database_connection
+
+    def dedup_enabled?
+      !@job_run_store.nil?
+    end
+
+    # Validates all configuration options. Called by the worker during
+    # initialization so the worker can remain agnostic about which options
+    # exist and which combinations are legal.
+    def validate!
+      validate_job_run_store!
+      validate_database_flavor!
+    end
+
+    private
+
+    def validate_job_run_store!
+      return if @job_run_store.nil?
+
+      if @job_run_store.is_a?(Symbol) && !VALID_JOB_RUN_STORES.include?(@job_run_store)
+        raise ArgumentError,
+          "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
+      end
+
+      is_symbol = @job_run_store.is_a?(Symbol)
+      responds = @job_run_store.respond_to?(:claim) && @job_run_store.respond_to?(:cleanup)
+
+      unless is_symbol || responds
+        raise ArgumentError,
+          "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
+      end
+    end
+
+    def validate_database_flavor!
+      return if @database_flavor.nil?
+
+      unless VALID_DATABASE_FLAVORS.include?(@database_flavor)
+        raise ArgumentError, "Schked `database_flavor` must be one of #{VALID_DATABASE_FLAVORS.inspect}; got: #{@database_flavor.inspect}"
+      end
     end
 
     private

@@ -4,17 +4,24 @@ require "rufus/scheduler"
 
 module Schked
   class Worker
+    DEFAULT_CLEANUP_INTERVAL = "60s"
+    DEFAULT_CLEANUP_RETENTION = 24 * 60 * 60 # seconds before cutoff
+
     def initialize(config:)
       @config = config
       @liveness_probe = nil
 
-      @locker = RedisLocker.new(config.redis, lock_ttl: 40_000, logger: config.logger) unless config.standalone?
+      config.validate!
+      @job_run_store = build_job_run_store
+      @locker = build_locker
 
-      @scheduler = Rufus::Scheduler.new(trigger_lock: locker)
+      scheduler_opts = {trigger_lock: locker}.compact
+      @scheduler = Rufus::Scheduler.new(**scheduler_opts)
 
       watch_signals
-      define_callbacks
-      define_extend_lock unless config.standalone?
+      Callbacks.new(config: config, job_run_store: @job_run_store).install(@scheduler)
+      define_extend_lock if locker
+      define_cleanup_job if dedup_with_database_store?
       load_schedule
       start_liveness_probe
     end
@@ -47,41 +54,42 @@ module Schked
 
     private
 
-    attr_reader :config, :scheduler, :locker, :liveness_probe
+    attr_reader :config, :scheduler, :locker, :liveness_probe, :job_run_store
 
-    def define_callbacks
-      cfg = config
+    def build_job_run_store
+      return nil unless config.dedup_enabled?
 
-      scheduler.define_singleton_method(:extract_job_name) do |job|
-        if job
-          job.opts[:as] || job.job_id
-        else
-          "unknown"
-        end
+      case config.job_run_store
+      when :redis
+        RedisJobRunStore.new(
+          redis_client: RedisClientFactory.build(config.redis),
+          logger: config.logger,
+          max_skew_seconds: config.max_skew
+        )
+      when :database
+        detected = DatabaseConnection.detect(
+          connection: config.database_connection,
+          flavor: config.database_flavor
+        )
+        DatabaseJobRunStore.new(
+          adapter: detected.adapter,
+          flavor: detected.flavor,
+          logger: config.logger
+        )
+      else
+        config.job_run_store
       end
+    end
 
-      scheduler.define_singleton_method(:on_error) do |job, error|
-        cfg.logger.fatal("Task #{extract_job_name(job)} failed with error: #{error.message}")
-        cfg.logger.error(error.backtrace.join("\n")) if error.backtrace
+    def build_locker
+      return nil if config.standalone?
+      return nil if config.dedup_enabled?
 
-        cfg.fire_callback(:on_error, job, error)
-      end
+      RedisLocker.new(config.redis, lock_ttl: 40_000, logger: config.logger)
+    end
 
-      scheduler.define_singleton_method(:on_pre_trigger) do |job, time|
-        cfg.logger.info("Started task: #{extract_job_name(job)}")
-
-        cfg.fire_callback(:before_start, job, time)
-      end
-
-      scheduler.define_singleton_method(:around_trigger) do |job, &block|
-        cfg.fire_around_callback(:around_job, job, &block)
-      end
-
-      scheduler.define_singleton_method(:on_post_trigger) do |job, time|
-        cfg.logger.info("Finished task: #{extract_job_name(job)}")
-
-        cfg.fire_callback(:after_finish, job, time)
-      end
+    def dedup_with_database_store?
+      config.dedup_enabled? && @job_run_store.is_a?(DatabaseJobRunStore)
     end
 
     def watch_signals
@@ -112,8 +120,26 @@ module Schked
       end
     end
 
+    def define_cleanup_job
+      store = @job_run_store
+      logger = config.logger
+
+      scheduler.every(DEFAULT_CLEANUP_INTERVAL, as: "Schked::Worker#cleanup_job_runs", overlap: false) do
+        cutoff = Time.now.to_i - (DEFAULT_CLEANUP_RETENTION + config.max_skew)
+        logger.info("Cleaning up database job runs older than #{cutoff}")
+        store.cleanup(cutoff)
+      rescue => e
+        logger.error("Failed to clean up database job runs: #{e.message}")
+      end
+    end
+
     def load_schedule
-      scheduler.instance_eval(schedule)
+      dsl = ScheduleDSL.new(
+        scheduler: scheduler,
+        dedup_enabled: config.dedup_enabled?,
+        max_skew_seconds: config.max_skew
+      )
+      dsl.instance_eval(schedule)
     end
 
     def start_liveness_probe

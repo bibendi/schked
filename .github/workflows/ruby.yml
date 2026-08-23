@@ -16,7 +16,35 @@ jobs:
     env:
       RUBY_IMAGE: ${{ matrix.ruby }}
       RUBY_DIST: "${{ contains(fromJson('[\"2.7\", \"3.0\", \"3.1\"]'), matrix.ruby) && 'bullseye' || 'bookworm' }}"
+      REDIS_URL: redis://localhost:6379/0
+      SCHKED_POSTGRES_URL: postgres://schked:schked@localhost:5432/schked
+      SCHKED_MYSQL_URL: mysql2://schked:schked@localhost:3306/schked
     name: Ruby ${{ matrix.ruby }}
+    services:
+      redis:
+        image: redis:7
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+        ports:
+          - 6379:6379
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: schked
+          POSTGRES_PASSWORD: schked
+          POSTGRES_DB: schked
+        options: --health-cmd "pg_isready -U schked" --health-interval 5s --health-timeout 5s --health-retries 10
+        ports:
+          - 5432:5432
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: schked
+          MYSQL_USER: schked
+          MYSQL_PASSWORD: schked
+        options: --health-cmd "mysqladmin ping -h 127.0.0.1 -u schked -pschked" --health-interval 5s --health-timeout 5s --health-retries 20
+        ports:
+          - 3306:3306
     steps:
       - uses: actions/checkout@v3
       - name: Set up Ruby
@@ -35,3 +63,12 @@ jobs:
         run: dip rspec rails
       - name: Run Redlock tests
         run: dip rspec redlock.1
+      - name: Run Postgres tests
+        if: ${{ matrix.ruby >= '3.0' }}
+        run: dip rspec postgres
+      - name: Run MySQL tests
+        if: ${{ matrix.ruby >= '3.0' }}
+        run: dip rspec mysql
+      - name: Run Sequel tests
+        if: ${{ matrix.ruby >= '3.0' }}
+        run: dip rspec sequel

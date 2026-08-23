@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "stringio"
 require "schked/cli"
 
 describe Schked::CLI do
@@ -13,6 +14,40 @@ describe Schked::CLI do
   after do
     Schked.instance_variable_set(:@config, nil)
     Schked.instance_variable_set(:@worker, nil)
+  end
+
+  describe "generate migration" do
+    it "prints Postgres DDL by default" do
+      output = capture_stdout { described_class.start(["generate-migration"]) }
+      expect(output).to include("CREATE TABLE schked_job_runs")
+      expect(output).to include("UNIQUE")
+    end
+
+    it "accepts --flavor=mysql" do
+      output = capture_stdout { described_class.start(["generate-migration", "--flavor=mysql"]) }
+      expect(output).to include("CREATE TABLE schked_job_runs")
+      expect(output).to include("UNIQUE KEY")
+    end
+
+    it "accepts a positional flavor argument" do
+      output = capture_stdout { described_class.start(["generate-migration", "mysql"]) }
+      expect(output).to include("UNIQUE KEY")
+    end
+
+    it "includes window_start column and index" do
+      output = capture_stdout { described_class.start(["generate-migration"]) }
+      expect(output).to include("window_start")
+      expect(output).to include("schked_job_runs_window_start_idx")
+    end
+
+    def capture_stdout
+      original = $stdout
+      $stdout = StringIO.new
+      yield
+      $stdout.string
+    ensure
+      $stdout = original
+    end
   end
 
   describe "start" do

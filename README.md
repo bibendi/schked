@@ -80,6 +80,10 @@ bundle exec schked show
 
 ### Duplicate scheduling
 
+Schked ships two coordination modes for high-availability deployments:
+
+#### Legacy: global Redis lock (default)
+
 When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked is using Redis for locks.
 
 You can configure Redis client as the following:
@@ -87,6 +91,52 @@ You can configure Redis client as the following:
 ```ruby
 Schked.config.redis = {url: ENV.fetch("REDIS_URL") }
 ```
+
+This is the default behavior — backward compatible with previous Schked versions. A single instance runs all jobs; standby instances hold the global Redis lock and stay idle.
+
+#### New: per-job deduplication
+
+When you want every scheduler instance to do useful work (and not require a global leader), opt into the per-job deduplication mode. Each recurring job claims its schedule interval atomically; only one instance wins each interval, so each job still runs exactly once across the cluster.
+
+Pick a coordination store:
+
+```ruby
+# Redis-backed (default Redis client from Schked.config.redis):
+Schked.config.job_run_store = :redis
+
+# Database-backed (no Redis required). Connection auto-detected from
+# ActiveRecord or Sequel; override via:
+Schked.config.job_run_store = :database
+Schked.config.database_connection = conn   # optional, responds to execute(sql, params)
+Schked.config.database_flavor = :postgres # optional, default :postgres (or :mysql)
+
+# Custom store responding to #claim(job_name, window_start) and #cleanup(older_than):
+Schked.config.job_run_store = my_store
+```
+
+Additional tuning:
+
+```ruby
+Schked.config.max_skew = 60  # max expected clock skew between instances (seconds)
+```
+
+Schedule behavior in deduplication mode:
+
+- `every` jobs are aligned to an absolute time grid so all instances share the same phase. The first firing is the next grid point relative to now — not relative to process start.
+- `cron` jobs already align to absolute time natively and need no change.
+- `at` / `in` (one-time) jobs are deduplicated too — the claim is permanent.
+- `interval` jobs **are not supported** and raise `Schked::ScheduleDSL::IntervalNotSupportedError` when scheduled in this mode. Their phase depends on job duration and cannot be grid-aligned. Use `every` or `cron` instead.
+
+##### Database store migration
+
+Run the migration generator to print the `schked_job_runs` DDL:
+
+```sh
+bundle exec schked generate-migration               # Postgres
+bundle exec schked generate-migration --flavor=mysql
+```
+
+Copy the SQL into your application's migration and run it. The gem does not write migration files or run DDL on its own — it stays framework-agnostic.
 
 ### Callbacks
 
