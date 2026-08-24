@@ -1,18 +1,13 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "sequel"
 
-# Sequel integration tests for the database-backed coordination store.
-# Exercises the +Schked::DatabaseAdapters::Sequel+ adapter path against a
-# live Postgres-flavored Sequel connection. Loaded only in the +sequel+
-# Appraisal gemfile (see the +default_args+ in dip.yml).
-describe Schked::DatabaseJobRunStore do
+# Sequel integration tests for +Schked::Adapters::Sequel+. Loaded only
+# under the +sequel+ Appraisal gemfile.
+describe Schked::Adapters::Sequel do
   def sequel_db
-    return @sequel_db if defined?(@sequel_db)
-
-    require "sequel"
-    url = ENV.fetch("SCHKED_POSTGRES_URL")
-    @sequel_db = Sequel.connect(url)
+    @sequel_db ||= Sequel.connect(ENV.fetch("SCHKED_POSTGRES_URL"))
   end
 
   def with_table
@@ -27,12 +22,11 @@ describe Schked::DatabaseJobRunStore do
     end
     yield
   ensure
-    sequel_db&.drop_table?(:schked_job_runs)
+    sequel_db&.disconnect
   end
 
   let(:logger) { Logger.new(File::NULL) }
-  let(:adapter) { Schked::DatabaseAdapters::Sequel.new(sequel_db) }
-  let(:store) { described_class.new(adapter: adapter, flavor: :postgres, logger: logger) }
+  subject(:store) { described_class.new(sequel_db, logger: logger) }
 
   around { |ex| with_table(&ex) }
 
@@ -40,6 +34,7 @@ describe Schked::DatabaseJobRunStore do
 
   it "returns true on the first claim" do
     expect(store.claim("job_a", Time.now.to_i)).to be true
+    expect(store.adapter_name).to eq "postgres"
   end
 
   it "returns false on a duplicate claim" do
@@ -52,14 +47,10 @@ describe Schked::DatabaseJobRunStore do
     window = Time.now.to_i
     threads = 20.times.map do
       Thread.new do
-        db = Sequel.connect(ENV.fetch("SCHKED_POSTGRES_URL"))
-        Schked::DatabaseJobRunStore.new(
-          adapter: Schked::DatabaseAdapters::Sequel.new(db),
-          flavor: :postgres,
-          logger: Logger.new(File::NULL)
-        ).claim("racey", window)
+        conn = Sequel.connect(ENV.fetch("SCHKED_POSTGRES_URL"))
+        described_class.new(conn, logger: Logger.new(File::NULL)).claim("racey", window)
       ensure
-        db&.disconnect
+        conn&.disconnect
       end
     end
     results = threads.map(&:value)
@@ -79,13 +70,6 @@ describe Schked::DatabaseJobRunStore do
 
       names = sequel_db[:schked_job_runs].select_map(:job_name)
       expect(names).to contain_exactly("new")
-    end
-  end
-
-  describe "auto flavor detection" do
-    it "detects postgres from the Sequel adapter_scheme" do
-      result = Schked::DatabaseConnection.detect(connection: sequel_db)
-      expect(result.flavor).to eq :postgres
     end
   end
 end

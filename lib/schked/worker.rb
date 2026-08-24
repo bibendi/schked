@@ -21,7 +21,7 @@ module Schked
       watch_signals
       Callbacks.new(config: config, job_run_store: @job_run_store).install(@scheduler)
       define_extend_lock if locker
-      define_cleanup_job if dedup_with_database_store?
+      define_cleanup_job if @job_run_store.respond_to?(:cleanup)
       load_schedule
       start_liveness_probe
     end
@@ -67,13 +67,8 @@ module Schked
           max_skew_seconds: config.max_skew
         )
       when :database
-        detected = DatabaseConnection.detect(
+        DatabaseConnection.detect(
           connection: config.database_connection,
-          flavor: config.database_flavor
-        )
-        DatabaseJobRunStore.new(
-          adapter: detected.adapter,
-          flavor: detected.flavor,
           logger: config.logger
         )
       else
@@ -86,10 +81,6 @@ module Schked
       return nil if config.dedup_enabled?
 
       RedisLocker.new(config.redis, lock_ttl: 40_000, logger: config.logger)
-    end
-
-    def dedup_with_database_store?
-      config.dedup_enabled? && @job_run_store.is_a?(DatabaseJobRunStore)
     end
 
     def watch_signals

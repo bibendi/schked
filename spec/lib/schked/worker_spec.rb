@@ -378,26 +378,45 @@ describe Schked::Worker do
   end
 
   describe "database-backed store" do
-    let(:fake_connection) { FakeDatabaseAdapter.new(adapter_name: "PostgreSQL") }
+    let(:fake_connection) { double("PG::Connection") }
+    let(:fake_adapter) do
+      Class.new(Schked::Adapters::Pg) do
+        attr_reader :claims
+        def initialize(conn, logger: nil)
+          super(conn, logger: logger || Logger.new(File::NULL))
+          @claims = []
+        end
+
+        def claim(job_name, window_start)
+          @claims << [job_name, window_start]
+          true
+        end
+
+        def cleanup(_older_than)
+          nil
+        end
+      end.new(fake_connection, logger: Logger.new(File::NULL))
+    end
 
     before do
       config.job_run_store = :database
-      config.database_connection = fake_connection
-      config.database_flavor = :postgres
+      config.database_connection = fake_adapter
     end
 
-    it "instantiates a DatabaseJobRunStore when job_run_store = :database" do
-      expect(Schked::DatabaseJobRunStore).to receive(:new).and_call_original
+    it "instantiates an adapter from the supplied connection" do
+      expect(Schked::DatabaseConnection).to receive(:detect)
+        .with(connection: fake_adapter, logger: config.logger)
+        .and_call_original
       worker
+    end
+
+    it "uses the detected adapter as the job run store" do
+      worker
+      expect(worker.send(:job_run_store)).to be fake_adapter
     end
 
     it "does not instantiate a RedisLocker" do
       expect(Schked::RedisLocker).not_to receive(:new)
-      worker
-    end
-
-    it "does not require Redis (no Redis call attempted)" do
-      expect(RedisClient).not_to receive(:new)
       worker
     end
 
@@ -408,7 +427,7 @@ describe Schked::Worker do
       expect(cleanup_job).not_to be_nil
     end
 
-    it "claims via the database store and runs the job" do
+    it "claims via the adapter and runs the job" do
       Tempfile.open("schedule") do |file|
         file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"
         file.flush
@@ -421,10 +440,7 @@ describe Schked::Worker do
         sleep 0.5
       end
 
-      inserts = fake_connection.queries.select { |q| q[:sql].include?("INSERT INTO schked_job_runs") }
-      expect(inserts).not_to be_empty
-      params = inserts.first[:params]
-      expect(params[0]).to eq "test_task"
+      expect(fake_adapter.claims.map(&:first)).to include("test_task")
     end
   end
 
@@ -435,7 +451,7 @@ describe Schked::Worker do
       expect_any_instance_of(Rufus::Scheduler).to receive(:join)
       expect(Schked::RedisLocker).to receive(:new).and_call_original
       expect(Schked::RedisJobRunStore).not_to receive(:new)
-      expect(Schked::DatabaseJobRunStore).not_to receive(:new)
+      expect(Schked::DatabaseConnection).not_to receive(:detect)
 
       worker.wait
     end
@@ -470,7 +486,7 @@ describe Schked::Worker do
     end
   end
 
-  describe "every grid alignment across instances (FR-011)" do
+  describe "every grid alignment across instances" do
     before { config.job_run_store = :redis }
 
     it "aligns every-job first_at to the absolute grid" do

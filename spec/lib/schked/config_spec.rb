@@ -91,22 +91,6 @@ describe Schked::Config do
     end
   end
 
-  describe "#database_flavor" do
-    it "is nil by default" do
-      expect(config.database_flavor).to be_nil
-    end
-
-    it "can be set to :postgres" do
-      config.database_flavor = :postgres
-      expect(config.database_flavor).to eq :postgres
-    end
-
-    it "can be set to :mysql" do
-      config.database_flavor = :mysql
-      expect(config.database_flavor).to eq :mysql
-    end
-  end
-
   describe "#database_connection" do
     it "is nil by default" do
       expect(config.database_connection).to be_nil
@@ -148,21 +132,6 @@ describe Schked::Config do
     it "raises for an object that doesn't respond to claim" do
       config.job_run_store = Object.new
       expect { config.validate! }.to raise_error(ArgumentError, /job_run_store/)
-    end
-
-    it "passes for :postgres database_flavor" do
-      config.database_flavor = :postgres
-      expect { config.validate! }.not_to raise_error
-    end
-
-    it "passes for :mysql database_flavor" do
-      config.database_flavor = :mysql
-      expect { config.validate! }.not_to raise_error
-    end
-
-    it "raises for an invalid database_flavor" do
-      config.database_flavor = :sqlite
-      expect { config.validate! }.to raise_error(ArgumentError, /database_flavor/)
     end
   end
 end

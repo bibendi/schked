@@ -36,12 +36,14 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 - `lib/schked/cli.rb` — Thor CLI (`exe/schked`). Default command is `start`. Commands: `start`, `show`, `generate-migration [--flavor=mysql]`.
 - `lib/schked/worker.rb` — wraps `Rufus::Scheduler`, loads schedule files, registers callbacks, and wires the coordination store.
 - `lib/schked/callbacks.rb` — installs rufus callbacks (extracted from Worker): per-job dedup claim, `:as:` enforcement, internal-job exemption.
-- `lib/schked/config.rb` — configuration. New dedup-related options: `job_run_store` (`:redis`/`:database`/custom), `max_skew` (default 60), `database_connection`, `database_flavor`.
-- `lib/schked/job_run_store.rb` — store interface contract (`claim`, `cleanup`).
+- `lib/schked/config.rb` — configuration. New dedup-related options: `job_run_store` (`:redis`/`:database`/custom), `max_skew` (default 60), `database_connection`.
+- `lib/schked/job_run_store.rb` — abstract store interface (`claim`, `cleanup`).
 - `lib/schked/redis_job_run_store.rb` — Redis-backed store (`SET NX EX` with TTL).
-- `lib/schked/database_job_run_store.rb` — pure-SQL store (Postgres `ON CONFLICT`, MySQL `ON DUPLICATE KEY`).
-- `lib/schked/database_adapters.rb` — wraps `PG::Connection`, `Mysql2::Client`, `Sequel::Database`, ActiveRecord adapter into a uniform `execute(sql, params)` contract.
-- `lib/schked/database_connection.rb` — auto-detects a connection (AR → Sequel) and infers flavor.
+- `lib/schked/adapters/pg.rb` — `PG::Connection` adapter (Postgres `ON CONFLICT`).
+- `lib/schked/adapters/mysql2.rb` — `Mysql2::Client` adapter (`ON DUPLICATE KEY UPDATE`).
+- `lib/schked/adapters/sequel.rb` — `Sequel::Database` adapter (Dataset API).
+- `lib/schked/adapters/active_record.rb` — ActiveRecord adapter (uses `exec_query` with binds).
+- `lib/schked/database_connection.rb` — auto-detects which adapter to build (AR → Sequel) and returns a ready-to-use concrete store.
 - `lib/schked/schedule_dsl.rb` — wraps the rufus DSL to grid-align `every` and reject `interval` in dedup mode.
 - `lib/schked/migration_generator.rb` — DDL constants for `schked generate-migration`.
 - `lib/schked/railtie.rb` — auto-adds `config/schedule.rb` from Rails root and wires `Rails.logger`.

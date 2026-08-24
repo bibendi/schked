@@ -55,6 +55,7 @@ interaction:
         command: bundle exec appraisal bundle exec rspec
 
   standardrb:
+
     description: Run Standard commands
     service: ruby
     command: bundle exec standardrb

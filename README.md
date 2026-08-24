@@ -80,11 +80,11 @@ bundle exec schked show
 
 ### Duplicate scheduling
 
-Schked ships two coordination modes for high-availability deployments:
+Schked ships two coordination strategies for multi-instance deployments. Choose one via `Schked.config.job_run_store`:
 
-#### Legacy: global Redis lock (default)
+#### Single-active-instance (default)
 
-When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked is using Redis for locks.
+When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked uses Redis for a global lock.
 
 You can configure Redis client as the following:
 
@@ -92,9 +92,9 @@ You can configure Redis client as the following:
 Schked.config.redis = {url: ENV.fetch("REDIS_URL") }
 ```
 
-This is the default behavior — backward compatible with previous Schked versions. A single instance runs all jobs; standby instances hold the global Redis lock and stay idle.
+This is the default — one instance runs all jobs; standby instances hold the global Redis lock and stay idle. This strategy will continue to be supported because it is the simplest and most predictable for many setups.
 
-#### New: per-job deduplication
+#### Per-job deduplication
 
 When you want every scheduler instance to do useful work (and not require a global leader), opt into the per-job deduplication mode. Each recurring job claims its schedule interval atomically; only one instance wins each interval, so each job still runs exactly once across the cluster.
 
@@ -107,8 +107,7 @@ Schked.config.job_run_store = :redis
 # Database-backed (no Redis required). Connection auto-detected from
 # ActiveRecord or Sequel; override via:
 Schked.config.job_run_store = :database
-Schked.config.database_connection = conn   # optional, responds to execute(sql, params)
-Schked.config.database_flavor = :postgres # optional, default :postgres (or :mysql)
+Schked.config.database_connection = conn   # optional PG::Connection / Mysql2::Client / Sequel / AR adapter
 
 # Custom store responding to #claim(job_name, window_start) and #cleanup(older_than):
 Schked.config.job_run_store = my_store

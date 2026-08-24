@@ -4,74 +4,37 @@ require "spec_helper"
 
 describe Schked::DatabaseConnection do
   describe ".detect" do
-    let(:mysql2_double) do
-      Class.new do
-        def self.adapter_name
-          "Mysql2"
-        end
-
-        def self.execute(_sql, _params = [])
-          1
-        end
-      end
+    it "returns a known adapter instance unchanged" do
+      adapter = Schked::Adapters::Pg.new(double("PG::Connection"))
+      expect(described_class.detect(connection: adapter)).to be adapter
     end
 
-    let(:pg_double) do
-      Class.new do
-        def self.adapter_name
-          "PostgreSQL"
-        end
+    it "raises a clear NotFoundError for an unsupported connection" do
+      expect { described_class.detect(connection: Object.new) }
+        .to raise_error(Schked::DatabaseConnection::NotFoundError, /could not detect/)
+    end
+  end
 
-        def self.execute(_sql, _params = [])
-          []
-        end
-      end
+  describe ".wrap" do
+    it "wraps a PG::Connection into Schked::Adapters::Pg" do
+      conn = double("PG::Connection")
+      stub_const("PG::Connection", Class.new)
+      allow(conn).to receive(:is_a?).with(PG::Connection).and_return(true)
+
+      expect(described_class.wrap(conn)).to be_a(Schked::Adapters::Pg)
     end
 
-    context "when an explicit connection is provided" do
-      let(:adapter) { Schked::DatabaseAdapters::Passthrough.new(double(adapter_name: "PostgreSQL", execute: [])) }
+    it "wraps a Mysql2::Client into Schked::Adapters::Mysql2" do
+      client = double("Mysql2::Client")
+      stub_const("Mysql2::Client", Class.new)
+      allow(client).to receive(:is_a?).with(Mysql2::Client).and_return(true)
 
-      it "wraps the explicit connection and exposes the adapter" do
-        result = described_class.detect(connection: adapter.connection)
-        expect(result.adapter.connection).to be adapter.connection
-      end
-
-      it "respects an explicit flavor" do
-        result = described_class.detect(connection: adapter.connection, flavor: :mysql)
-        expect(result.flavor).to eq :mysql
-      end
+      expect(described_class.wrap(client)).to be_a(Schked::Adapters::Mysql2)
     end
 
-    context "when no connection is available" do
-      it "raises a clear NotFoundError" do
-        expect(defined?(ActiveRecord)).to be_nil
-        expect(defined?(Sequel)).to be_nil
-
-        expect { described_class.detect }.to raise_error(Schked::DatabaseConnection::NotFoundError, /connection/)
-      end
-    end
-
-    context "when adapter_name is unknown" do
-      let(:adapter) { Schked::DatabaseAdapters::Passthrough.new(double(adapter_name: "MysteryDB", execute: [])) }
-
-      it "defaults to :postgres flavor" do
-        result = described_class.detect(connection: adapter.connection)
-        expect(result.flavor).to eq :postgres
-      end
-    end
-
-    context "when the underlying adapter is Mysql2" do
-      it "auto-detects :mysql flavor via the wrapped adapter's adapter_name" do
-        result = described_class.detect(connection: mysql2_double)
-        expect(result.flavor).to eq :mysql
-      end
-    end
-
-    context "when the underlying adapter is Postgres" do
-      it "auto-detects :postgres flavor via the wrapped adapter's adapter_name" do
-        result = described_class.detect(connection: pg_double)
-        expect(result.flavor).to eq :postgres
-      end
+    it "raises NotFoundError for an unknown connection" do
+      expect { described_class.wrap(Object.new) }
+        .to raise_error(Schked::DatabaseConnection::NotFoundError, /could not detect/)
     end
   end
 end

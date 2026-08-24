@@ -4,10 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [2.0.0] - 2026-08-23
 
-- Added an opt-in per-job deduplication mode for multi-instance deployments. The previous single-active-instance Redis lock remains the default. Set `job_run_store = :redis`, `:database`, or a custom object to enable it. [#43]
-  - Each recurring job now claims its schedule interval atomically, so different jobs run on different instances concurrently while every job still runs exactly once per interval across the whole cluster.
-  - The new database backend lets you deduplicate without Redis. `database_connection` can be a `PG::Connection`, `Mysql2::Client`, `Sequel::Database`, or ActiveRecord adapter; the connection is also auto-detected when ActiveRecord or Sequel is loaded. `schked generate-migration [--flavor=mysql]` prints the required table DDL.
-  - **BREAKING** in this mode: `every` jobs are aligned to an absolute time grid so all instances share the same phase — the first firing is no longer relative to process start. `cron`, `at`, and `in` jobs are unaffected. `interval` jobs are no longer supported and raise a clear error, since their phase drifts with job duration and cannot be deduplicated.
+- Added an opt-in per-job deduplication mode for multi-instance deployments. The single-active-instance Redis lock remains one of the supported strategies. Set `job_run_store = :redis`, `:database`, or a custom object to enable dedup. [#43]
+  - Each recurring job claims its schedule interval atomically, so different jobs run on different instances concurrently while every job still runs exactly once per interval across the whole cluster.
+  - The new database backend lets you deduplicate without Redis. `database_connection` can be a `PG::Connection`, `Mysql2::Client`, `Sequel::Database`, or an ActiveRecord adapter; the connection is also auto-detected when ActiveRecord or Sequel is loaded. `schked generate-migration [--flavor=mysql]` prints the required table DDL.
+  - **BREAKING** in dedup mode: `every` jobs are aligned to an absolute time grid so all instances share the same phase — the first firing is no longer relative to process start. `cron`, `at`, and `in` jobs are unaffected. `interval` jobs are no longer supported and raise a clear error, since their phase drifts with job duration and cannot be deduplicated.
 
 ## [1.5.0] - 2026-07-08
 

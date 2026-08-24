@@ -23,10 +23,18 @@ module Schked
       key = build_key(job_name, window_start)
       ttl = @ttl || default_ttl
 
-      # +SET ... NX EX+ returns "OK" if the key was created, +nil+ if it
-      # already existed. Transport errors (connection refused, timeout, ...)
-      # raise out of this method so the caller knows the store is unavailable
-      # — silently returning +false+ would skip every job while Redis is down.
+      # +SET ... NX EX+ is atomic on a single Redis instance and is the
+      # idiomatic primitive for "claim this slot for at most N seconds".
+      # Transport errors (connection refused, timeout, ...) raise out of
+      # this method so the caller knows the store is unavailable — silently
+      # returning +false+ would skip every job while Redis is down.
+      #
+      # Why not Redlock? Redlock (the algorithm used by +RedisLocker+) is
+      # designed for cluster-wide consensus across multiple Redis masters.
+      # For this dedup, a single +SET NX EX+ is already atomic per
+      # instance and sufficient for exactly-once across the cluster of
+      # *schedulers* — the scheduler cluster itself uses one Redis (or a
+      # single master with replicas).
       redis_client.call("SET", key, "1", "NX", "EX", ttl) == "OK"
     end
 

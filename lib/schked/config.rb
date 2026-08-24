@@ -4,7 +4,6 @@ require "logger"
 
 module Schked
   class Config
-    VALID_DATABASE_FLAVORS = %i[postgres mysql].freeze
     VALID_JOB_RUN_STORES = %i[redis database].freeze
 
     attr_writer :logger,
@@ -13,8 +12,7 @@ module Schked
       :standalone,
       :job_run_store,
       :max_skew,
-      :database_connection,
-      :database_flavor
+      :database_connection
 
     def liveness_probe
       @liveness_probe ||= LivenessProbeConfig.new
@@ -94,8 +92,6 @@ module Schked
       @max_skew ||= 60
     end
 
-    attr_reader :database_flavor
-
     attr_reader :database_connection
 
     def dedup_enabled?
@@ -107,7 +103,6 @@ module Schked
     # exist and which combinations are legal.
     def validate!
       validate_job_run_store!
-      validate_database_flavor!
     end
 
     private
@@ -128,16 +123,6 @@ module Schked
           "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
       end
     end
-
-    def validate_database_flavor!
-      return if @database_flavor.nil?
-
-      unless VALID_DATABASE_FLAVORS.include?(@database_flavor)
-        raise ArgumentError, "Schked `database_flavor` must be one of #{VALID_DATABASE_FLAVORS.inspect}; got: #{@database_flavor.inspect}"
-      end
-    end
-
-    private
 
     def callbacks
       @callbacks ||= Hash.new { |hsh, key| hsh[key] = [] }
