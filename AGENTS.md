@@ -25,7 +25,7 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 
 ## Tooling
 
-- **Ruby:** supports `>= 2.7`; CI tests `2.7`, `3.0`, `3.1`, `3.2`, `3.3`, `3.4`, `4.0`.
+- **Ruby:** supports `>= 3.0`; CI tests `3.0`, `3.1`, `3.2`, `3.3`, `3.4`, `4.0`.
 - **Linter:** [StandardRB](https://github.com/standardrb/standard) (configured in `.standard.yml`). Run with `dip standardrb` or `bundle exec standardrb`.
 - **Pre-commit:** `lefthook.yml` runs `bundle exec standardrb --fix {staged_files}`.
 - **Multi-version testing:** [Appraisal](https://github.com/thoughtbot/appraisal) generates gemfiles under `gemfiles/` from `Appraisals`. Regenerate with `dip appraisal install` after changing `Appraisals`.

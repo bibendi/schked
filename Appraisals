@@ -33,21 +33,15 @@ appraise "redlock.1" do
   gem "redlock", "~> 1.3"
 end
 
-if RUBY_VERSION >= "3.0"
-  appraise "postgres" do
-    gem "pg", "~> 1.5"
-  end
+appraise "postgres" do
+  gem "pg", "~> 1.5"
 end
 
-if RUBY_VERSION >= "3.0"
-  appraise "mysql" do
-    gem "mysql2", "~> 0.5"
-  end
+appraise "mysql" do
+  gem "mysql2", "~> 0.5"
 end
 
-if RUBY_VERSION >= "3.0"
-  appraise "sequel" do
-    gem "sequel", "~> 5.0"
-    gem "pg", "~> 1.5"
-  end
+appraise "sequel" do
+  gem "sequel", "~> 5.0"
+  gem "pg", "~> 1.5"
 end
