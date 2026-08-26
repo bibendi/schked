@@ -26,12 +26,5 @@ module Schked
     def cleanup(older_than)
       raise NotImplementedError, "#{self.class} must implement #cleanup(older_than)"
     end
-
-    # Returns the natural TTL (in seconds) the backend should use for a job
-    # with the given interval. Backends may override; defaults to
-    # +interval + max_skew + buffer+.
-    def ttl_for(interval_seconds, max_skew_seconds, buffer_seconds: 60)
-      interval_seconds.to_i + max_skew_seconds.to_i + buffer_seconds.to_i
-    end
   end
 end

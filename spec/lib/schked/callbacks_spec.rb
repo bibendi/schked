@@ -83,6 +83,27 @@ describe Schked::Callbacks do
         scheduler.shutdown(wait: false)
       end
 
+      it "rate-limits the missing-`as:` guidance to one error per job" do
+        # An unlabeled `every 10s` job fires 8_640 times a day; spamming
+        # fatal-level logs for every firing would drown real errors. The
+        # full guidance is logged once, repeat firings only get a debug note.
+        allow(store).to receive(:claim).and_return(true)
+
+        first_scheduler = Rufus::Scheduler.new
+        described_class.new(config: config, job_run_store: store).install(first_scheduler)
+        fired = 0
+        # The same job re-fires on an interval (explicit first_at makes the
+        # first firing immediate instead of one period away).
+        first_scheduler.every("1s", first_at: Time.now + 0.2, timeout: "1s") { fired += 1 }
+        sleep 2.5
+
+        expect(fired).to eq 0
+        expect(logger).to have_received(:error).with(/no `as:` label/).once
+        expect(logger).to have_received(:debug).with(/still no `as:` label/).at_least(:once)
+        expect(store).not_to have_received(:claim)
+        first_scheduler.shutdown(wait: false)
+      end
+
       it "does not claim for internal Schked::Worker#* jobs" do
         scheduler = Rufus::Scheduler.new
         described_class.new(config: config, job_run_store: store).install(scheduler)

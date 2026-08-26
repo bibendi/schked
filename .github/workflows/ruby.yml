@@ -64,11 +64,8 @@ jobs:
       - name: Run Redlock tests
         run: dip rspec redlock.1
       - name: Run Postgres tests
-        if: ${{ matrix.ruby >= '3.0' }}
         run: dip rspec postgres
       - name: Run MySQL tests
-        if: ${{ matrix.ruby >= '3.0' }}
         run: dip rspec mysql
       - name: Run Sequel tests
-        if: ${{ matrix.ruby >= '3.0' }}
         run: dip rspec sequel

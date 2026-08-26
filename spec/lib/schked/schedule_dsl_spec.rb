@@ -39,9 +39,27 @@ describe Schked::ScheduleDSL do
 
       now = Time.now.to_f
       first_at = job.first_at.to_f
-      # Shifted by +max_skew+, so the slot is at least +max_skew+ in the future.
-      expect(first_at).to be >= (now + 60 - 1)
-      expect(first_at % (6 * 60)).to be_within(1.0).of(0)
+      # rufus-scheduler rejects a past +first_at+, so the slot must be
+      # strictly in the future...
+      expect(first_at).to be > now
+      # ...and land on the absolute grid (multiples of the interval),
+      # which is what keeps instances phase-aligned despite clock skew.
+      expect(first_at % (6 * 60)).to be_within(0.001).of(0)
+    end
+
+    it "keeps sub-skew intervals strictly in the future" do
+      # Regression: intervals comparable to or smaller than +max_skew+ used to
+      # resolve to a slot in the past, making rufus raise
+      # `ArgumentError: cannot set first[_at|_in] in the past` during boot.
+      25.times do |i|
+        expect {
+          dsl.instance_eval { every("30s", as: "sub_skew_#{i}") {} }
+        }.not_to raise_error
+
+        job = scheduler.jobs.find { |j| j.opts[:as] == "sub_skew_#{i}" }
+        expect(job.first_at.to_f).to be > Time.now.to_f - 1
+        expect(job.first_at.to_i % 30).to be_within(0.001).of(0)
+      end
     end
 
     it "overrides a user-supplied first_at: in dedup mode" do

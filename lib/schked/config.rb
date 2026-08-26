@@ -110,18 +110,16 @@ module Schked
     def validate_job_run_store!
       return if @job_run_store.nil?
 
-      if @job_run_store.is_a?(Symbol) && !VALID_JOB_RUN_STORES.include?(@job_run_store)
-        raise ArgumentError,
-          "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
+      message = "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, " \
+        "a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
+
+      valid = if @job_run_store.is_a?(Symbol)
+        VALID_JOB_RUN_STORES.include?(@job_run_store)
+      else
+        @job_run_store.respond_to?(:claim) && @job_run_store.respond_to?(:cleanup)
       end
 
-      is_symbol = @job_run_store.is_a?(Symbol)
-      responds = @job_run_store.respond_to?(:claim) && @job_run_store.respond_to?(:cleanup)
-
-      unless is_symbol || responds
-        raise ArgumentError,
-          "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
-      end
+      raise ArgumentError, message unless valid
     end
 
     def callbacks

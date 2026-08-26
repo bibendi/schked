@@ -21,7 +21,7 @@ module Schked
       validate!(job_name, window_start)
 
       key = build_key(job_name, window_start)
-      ttl = @ttl || default_ttl
+      ttl = default_ttl
 
       # +SET ... NX EX+ is atomic on a single Redis instance and is the
       # idiomatic primitive for "claim this slot for at most N seconds".
@@ -41,12 +41,6 @@ module Schked
     def cleanup(_older_than)
       # Native Redis TTL handles expiration; nothing to do here.
       nil
-    end
-
-    # Sets the TTL (seconds) used for subsequent claims. Intended for tests
-    # that need to assert TTL behavior without waiting for the natural default.
-    def ttl=(seconds)
-      @ttl = Integer(seconds)
     end
 
     private

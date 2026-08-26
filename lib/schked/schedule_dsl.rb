@@ -57,9 +57,16 @@ module Schked
       @scheduler.every(duration, *args, **kwargs, &block)
     end
 
-    def next_grid_point_epoch(seconds, now)
-      points = (now / seconds).ceil + 1
-      points * seconds
+    def next_grid_point_epoch(seconds, shifted_now)
+      grid_point = (shifted_now / seconds).ceil * seconds
+      # When the interval is comparable to or smaller than +max_skew+, the
+      # grid point closest to "now − max_skew" may still lie in the past,
+      # and rufus-scheduler rejects a past +first_at+. Advance by whole
+      # periods until the slot is strictly in the future: every step keeps
+      # the value on the absolute (epoch-multiple) grid, so all instances
+      # stay phase-aligned regardless of how many steps they take.
+      grid_point += seconds while grid_point <= Time.now.to_f
+      grid_point
     end
 
     def interval_error_message

@@ -21,7 +21,7 @@ module Schked
       watch_signals
       Callbacks.new(config: config, job_run_store: @job_run_store).install(@scheduler)
       define_extend_lock if locker
-      define_cleanup_job if @job_run_store.respond_to?(:cleanup)
+      define_cleanup_job if database_backed_store?
       load_schedule
       start_liveness_probe
     end
@@ -122,6 +122,14 @@ module Schked
       rescue => e
         logger.error("Failed to clean up database job runs: #{e.message}")
       end
+    end
+
+    # Only stores whose +#cleanup+ actually deletes rows need the sweep.
+    # +RedisJobRunStore#cleanup+ is a no-op (native TTL handles retention),
+    # so scheduling it would just log noise on every instance. Custom
+    # stores keep the sweep because they implemented +#cleanup+ for it.
+    def database_backed_store?
+      !@job_run_store.is_a?(RedisJobRunStore)
     end
 
     def load_schedule

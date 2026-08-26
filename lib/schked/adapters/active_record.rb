@@ -11,9 +11,17 @@ module Schked
     class ActiveRecord
       include JobRunStore
 
+      SUPPORTED_ADAPTERS = ["PostgreSQL", "Mysql2"].freeze
+
       attr_reader :logger
 
       def initialize(connection, logger: Logger.new($stdout))
+        name = connection.respond_to?(:adapter_name) ? connection.adapter_name.to_s : ""
+        unless SUPPORTED_ADAPTERS.any? { |supported| name.casecmp?(supported) }
+          raise ArgumentError,
+            "Schked::Adapters::ActiveRecord supports PostgreSQL and Mysql2 connections only, got: #{name.inspect}"
+        end
+
         @connection = connection
         @logger = logger
       end
@@ -24,17 +32,21 @@ module Schked
         ts = window_start.is_a?(Time) ? window_start.to_i : Integer(window_start)
         run_at = Time.now.to_f
 
-        sql = rewrite_placeholders(
-          "INSERT INTO #{TABLE} (job_name, window_start, run_at) VALUES (?, ?, ?) " \
-          "ON CONFLICT (job_name, window_start) DO NOTHING RETURNING id"
-        )
-        result = @connection.exec_query(sql, "Schked", [
-          bind("job_name", job_name),
-          bind("window_start", ts),
-          bind("run_at", run_at)
-        ])
-        # +ActiveRecord::Result+ exposes +#length+ (number of rows).
-        Integer(result.length).positive?
+        if postgres?
+          sql = rewrite_placeholders(
+            "INSERT INTO #{TABLE} (job_name, window_start, run_at) VALUES (?, ?, ?) " \
+            "ON CONFLICT (job_name, window_start) DO NOTHING RETURNING id"
+          )
+          result = @connection.exec_query(sql, "Schked CLAIM", [
+            bind("job_name", job_name),
+            bind("window_start", ts),
+            bind("run_at", run_at)
+          ])
+          # +ActiveRecord::Result+ exposes +#length+ (number of returned ids).
+          Integer(result.length).positive?
+        else
+          mysql2_claim(job_name, ts, run_at)
+        end
       rescue ArgumentError
         raise
       rescue => e
@@ -59,6 +71,24 @@ module Schked
       private
 
       TABLE = "schked_job_runs"
+
+      # MySQL has no +RETURNING+: an ignored insert leaves no row-count on
+      # the +ActiveRecord::Result+, so we prepare the statement through the
+      # underlying Mysql2 client and read +stmt.affected_rows+ (1 = inserted,
+      # 0 = IGNOREd duplicate). The socket is shared with the AR connection,
+      # which is safe: statements run synchronously, one at a time.
+      def mysql2_claim(job_name, ts, run_at)
+        client = @connection.raw_connection
+        stmt = client.prepare(
+          "INSERT IGNORE INTO #{TABLE} (job_name, window_start, run_at) VALUES (?, ?, ?)"
+        )
+        begin
+          stmt.execute(job_name, ts, run_at)
+          Integer(stmt.affected_rows).positive?
+        ensure
+          stmt.close
+        end
+      end
 
       def bind(name, value)
         ::ActiveRecord::Relation::QueryAttribute.new(name, value, type_for(value))

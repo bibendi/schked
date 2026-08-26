@@ -170,18 +170,91 @@ describe Schked::Adapters do
   end
 
   describe Schked::Adapters::ActiveRecord do
-    # ActiveRecord-dependent code is exercised end-to-end in the rails
-    # integration suite. The agnostic gemfile does not pull in AR, so we
-    # verify only properties that don't touch AR constants here.
-    let(:connection) { double("AR::Connection", adapter_name: "PostgreSQL") }
+    # ActiveRecord-dependent internals are exercised end-to-end in the rails
+    # integration suite. The agnostic/redlock gemfiles do not pull in AR, so
+    # these examples only exercise paths that never reference AR constants.
+    describe "connection validation" do
+      it "accepts PostgreSQL connections" do
+        conn = double("AR::Connection", adapter_name: "PostgreSQL")
+        expect { described_class.new(conn, logger: logger) }.not_to raise_error
+      end
 
-    it "reports adapter_name from the AR connection" do
-      stub_const("ActiveRecord", Module.new) unless defined?(::ActiveRecord)
-      if defined?(::ActiveRecord)
-        store = Schked::Adapters::ActiveRecord.new(connection, logger: logger)
+      it "accepts Mysql2 connections" do
+        conn = double("AR::Connection", adapter_name: "Mysql2")
+        expect { described_class.new(conn, logger: logger) }.not_to raise_error
+      end
+
+      it "refuses unsupported connections loudly at construction" do
+        # A silent fallback would mean every later firing fails per-job;
+        # failing fast forces operators to pick a supported backend.
+        conn = double("AR::Connection", adapter_name: "SQLite")
+        expect {
+          described_class.new(conn, logger: logger)
+        }.to raise_error(ArgumentError, /supports PostgreSQL and Mysql2.*SQLite/m)
+      end
+
+      it "handles connections without adapter_name" do
+        conn = double("AR::Connection")
+        expect {
+          described_class.new(conn, logger: logger)
+        }.to raise_error(ArgumentError, /got: ""/)
+      end
+    end
+
+    describe "#claim on the Mysql2 flavor" do
+      let(:raw_client) { double("Mysql2::Client") }
+      let(:stmt) { double("Mysql2::Statement") }
+      let(:conn) { double("AR::Connection", adapter_name: "Mysql2", raw_connection: raw_client) }
+
+      subject(:store) { described_class.new(conn, logger: logger) }
+
+      it "uses INSERT IGNORE through the underlying client" do
+        allow(raw_client).to receive(:prepare) do |sql|
+          expect(sql).to include("INSERT IGNORE INTO schked_job_runs")
+          stmt
+        end
+        expect(stmt).to receive(:execute).with("job_a", anything, anything)
+        allow(stmt).to receive(:close)
+
+        # mysql2 sets CLIENT_FOUND_ROWS off by default, so affected_rows == 1
+        # really means "row inserted" (vs matched).
+        allow(stmt).to receive(:affected_rows).and_return(1)
+        expect(store.claim("job_a", 1234)).to be true
+      end
+
+      it "returns false when the insert was IGNOREd (affected_rows == 0)" do
+        allow(raw_client).to receive(:prepare).and_return(stmt)
+        allow(stmt).to receive(:execute)
+        allow(stmt).to receive(:close)
+        allow(stmt).to receive(:affected_rows).and_return(0)
+        expect(store.claim("job_a", 1234)).to be false
+      end
+
+      it "closes the prepared statement" do
+        allow(raw_client).to receive(:prepare).and_return(stmt)
+        allow(stmt).to receive(:execute)
+        allow(stmt).to receive(:affected_rows).and_return(1)
+        expect(stmt).to receive(:close)
+
+        store.claim("job_a", 1234)
+      end
+
+      it "does not call exec_query (which would send Postgres-only SQL)" do
+        allow(raw_client).to receive(:prepare).and_return(stmt)
+        allow(stmt).to receive(:execute)
+        allow(stmt).to receive(:affected_rows).and_return(1)
+        allow(stmt).to receive(:close)
+        expect(conn).not_to receive(:exec_query)
+
+        store.claim("job_a", 1234)
+      end
+    end
+
+    describe "#adapter_name" do
+      it "reports adapter_name from the AR connection" do
+        conn = double("AR::Connection", adapter_name: "PostgreSQL")
+        store = described_class.new(conn, logger: logger)
         expect(store.adapter_name).to eq "PostgreSQL"
-      else
-        skip "ActiveRecord is not loaded in this gemfile"
       end
     end
   end

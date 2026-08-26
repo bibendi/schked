@@ -427,6 +427,15 @@ describe Schked::Worker do
       expect(cleanup_job).not_to be_nil
     end
 
+    it "does not schedule the cleanup sweep for the Redis-backed store" do
+      # RedisJobRunStore#cleanup is a no-op; running it would just log noise.
+      config.job_run_store = :redis
+      worker
+
+      cleanup_job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == "Schked::Worker#cleanup_job_runs" }
+      expect(cleanup_job).to be_nil
+    end
+
     it "claims via the adapter and runs the job" do
       Tempfile.open("schedule") do |file|
         file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"

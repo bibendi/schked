@@ -107,7 +107,7 @@ Schked.config.job_run_store = :redis
 # Database-backed (no Redis required). Connection auto-detected from
 # ActiveRecord or Sequel; override via:
 Schked.config.job_run_store = :database
-Schked.config.database_connection = conn   # optional PG::Connection / Mysql2::Client / Sequel / AR adapter
+Schked.config.database_connection = conn   # optional PG::Connection / Mysql2::Client / Sequel / AR adapter (PostgreSQL or Mysql2)
 
 # Custom store responding to #claim(job_name, window_start) and #cleanup(older_than):
 Schked.config.job_run_store = my_store

@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Added an opt-in per-job deduplication mode for multi-instance deployments. The single-active-instance Redis lock remains one of the supported strategies. Set `job_run_store = :redis`, `:database`, or a custom object to enable dedup. [#43]
   - Each recurring job claims its schedule interval atomically, so different jobs run on different instances concurrently while every job still runs exactly once per interval across the whole cluster.
-  - The new database backend lets you deduplicate without Redis. `database_connection` can be a `PG::Connection`, `Mysql2::Client`, `Sequel::Database`, or an ActiveRecord adapter; the connection is also auto-detected when ActiveRecord or Sequel is loaded. `schked generate-migration [--flavor=mysql]` prints the required table DDL.
+  - The new database backend lets you deduplicate without Redis. `database_connection` can be a `PG::Connection`, `Mysql2::Client`, `Sequel::Database`, or an ActiveRecord adapter (PostgreSQL or Mysql2 only); the connection is also auto-detected when ActiveRecord or Sequel is loaded. `schked generate-migration [--flavor=mysql]` prints the required table DDL.
   - **BREAKING** in dedup mode: `every` jobs are aligned to an absolute time grid so all instances share the same phase — the first firing is no longer relative to process start. `cron`, `at`, and `in` jobs are unaffected. `interval` jobs are no longer supported and raise a clear error, since their phase drifts with job duration and cannot be deduplicated.
 - **BREAKING**: Dropped support for Ruby 2.7. The minimum supported Ruby is now 3.0. CI no longer runs on 2.7, `required_ruby_version` is `>= 3.0`, and `.standard.yml` targets Ruby 3.0.
 

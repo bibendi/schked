@@ -22,6 +22,11 @@ module Schked
       cfg = @config
       store = @job_run_store
       internal = method(:internal_job?)
+      # Unlabeled jobs are skipped on every firing; logging the guidance at
+      # error level for each firing would spam operators (an `every 10s`
+      # job yields 8_640 messages per day). Remember which labels were
+      # already reported and downgrade repeat notices to debug.
+      missing_as_reported = {}
 
       scheduler.define_singleton_method(:extract_job_name) do |job|
         if job
@@ -52,11 +57,16 @@ module Schked
             # with that key would silently duplicate every run across the
             # cluster. Refuse to claim; the operator must add +as:+ to
             # their schedule for dedup to be correct.
-            cfg.logger.error(
-              "Task #{job_name} has no `as:` label and cannot be deduplicated " \
-              "(each process generates a unique job_id). Add `as: \"my_job\"` to " \
-              "the schedule entry. Skipping this firing."
-            )
+            if missing_as_reported.key?(job_name)
+              cfg.logger.debug("Skipping task #{job_name}: still no `as:` label (already reported).")
+            else
+              cfg.logger.error(
+                "Task #{job_name} has no `as:` label and cannot be deduplicated " \
+                "(each process generates a unique job_id). Add `as: \"my_job\"` to " \
+                "the schedule entry. Skipping this firing."
+              )
+              missing_as_reported[job_name] = true
+            end
             next false
           end
 
