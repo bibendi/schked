@@ -126,6 +126,20 @@ Schedule behavior in deduplication mode:
 - `at` / `in` (one-time) jobs are deduplicated too — the claim is permanent.
 - `interval` jobs **are not supported** and raise `Schked::ScheduleDSL::IntervalNotSupportedError` when scheduled in this mode. Their phase depends on job duration and cannot be grid-aligned. Use `every` or `cron` instead.
 
+##### Durability of the coordination store
+
+Choosing between `:redis` and `:database` is also choosing how strong the exactly-once guarantee is:
+
+- **`:database`** — claims are durable rows guarded by a UNIQUE constraint. They survive database restarts and failovers, and nothing removes them before the internal cleanup sweep (which keeps rows for 24 hours). Prefer this backend when a duplicate run is unacceptable.
+- **`:redis`** — claims are keys with a 24-hour TTL, so the guarantee is only as strong as the Redis instance's durability:
+  - **Eviction policy** must be `noeviction` (or the instance must never reach `maxmemory`). Claim keys have a TTL, so both `allkeys-*` and `volatile-*` policies can evict them under memory pressure — the evicted window may then be claimed and executed by another instance.
+  - **Persistence**: a Redis restart without AOF/RDB loses in-flight claims. If it happens inside the contention window (the `max_skew`-wide interval during which instances race to claim the same slot), the job may run twice. Enable AOF, or use `:database` if you cannot accept that risk.
+
+Failure semantics (both backends):
+
+- The claim is taken **before** the job runs, so the semantics are *at-most-once per window*: if the winning instance crashes mid-run, that window's execution is lost and Schked does not retry it.
+- The coordination store is a hard dependency: when it is unreachable, the claim fails and the firing is skipped (fail-closed) rather than risking a duplicate.
+
 ##### Database store migration
 
 Run the migration generator to print the `schked_job_runs` DDL:
