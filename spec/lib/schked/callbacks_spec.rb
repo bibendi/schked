@@ -56,6 +56,27 @@ describe Schked::Callbacks do
         scheduler.shutdown(wait: false)
       end
 
+      it "fails closed with a dedicated message when the store is unavailable" do
+        allow(store).to receive(:claim).and_raise(RedisClient::ConnectionError, "connection refused")
+        on_error_fired = 0
+        config.register_callback(:on_error) { on_error_fired += 1 }
+
+        scheduler = Rufus::Scheduler.new
+        described_class.new(config: config, job_run_store: store).install(scheduler)
+
+        body_called = false
+        scheduler.in("0s", as: :store_down) { body_called = true }
+        sleep 0.3
+
+        # Fail closed: the body must not run, the message must say the
+        # *store* is unavailable (not that the task failed), and monitoring
+        # callbacks still see the error.
+        expect(body_called).to be false
+        expect(logger).to have_received(:fatal).with(/Skipped task store_down: job run store unavailable/)
+        expect(on_error_fired).to eq 1
+        scheduler.shutdown(wait: false)
+      end
+
       it "coerces symbol job names to strings" do
         scheduler = Rufus::Scheduler.new
         described_class.new(config: config, job_run_store: store).install(scheduler)

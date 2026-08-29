@@ -19,13 +19,23 @@ describe Schked::RedisJobRunStore do
       expect(redis_client.call("EXISTS", key)).to eq 1
     end
 
-    it "sets a TTL on the claim key" do
+    it "sets a TTL on the claim key sized for the contention window" do
       store.claim("job_a", Time.now.to_i)
 
       keys = redis_client.call("KEYS", "schked:job_run:*")
       expect(keys).not_to be_empty
-      ttl = redis_client.call("TTL", keys.first)
-      expect(ttl).to be > 0
+      # max(10 * max_skew, 1h): covers contention across skewed instances
+      # with a floor for one-shot at/in claims, without hoarding a day of
+      # keys for high-frequency jobs.
+      expect(redis_client.call("TTL", keys.first)).to eq 3600
+    end
+
+    it "scales the TTL with max_skew" do
+      skewed = described_class.new(redis_client: redis_client, logger: logger, max_skew_seconds: 700)
+      skewed.claim("job_a", Time.now.to_i)
+
+      key = redis_client.call("KEYS", "schked:job_run:job_a:*").first
+      expect(redis_client.call("TTL", key)).to eq 7000
     end
 
     it "raises when Redis is unreachable (so the worker can fail loudly instead of silently skipping every job)" do

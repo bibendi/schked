@@ -62,8 +62,13 @@ describe Schked::ScheduleDSL do
       end
     end
 
-    it "overrides a user-supplied first_at: in dedup mode" do
-      dsl.instance_eval do
+    it "overrides a user-supplied first_at: in dedup mode, with a warning" do
+      dsl_logger = instance_double(Logger).as_null_object
+      warned_dsl = described_class.new(scheduler: scheduler, dedup_enabled: true, max_skew_seconds: 60, logger: dsl_logger)
+
+      expect(dsl_logger).to receive(:warn).with(/ignoring `first_at:/)
+
+      warned_dsl.instance_eval do
         every("6m", first_at: Time.now + 3600, as: "user_first_at") {}
       end
 

@@ -71,7 +71,16 @@ module Schked
           end
 
           window_start = job.previous_time || job.scheduled_at
-          claimed = store.claim(job_name, window_start)
+          begin
+            claimed = store.claim(job_name, window_start)
+          rescue => e
+            # Fail closed, but say what actually happened: the task did not
+            # fail — the coordination store is unavailable, and firing is
+            # skipped to avoid a duplicate run.
+            cfg.logger.fatal("Skipped task #{job_name}: job run store unavailable: #{e.class} #{e.message}")
+            cfg.fire_callback(:on_error, job, e)
+            next false
+          end
           unless claimed
             cfg.logger.info("Skipped task: #{job_name} (already claimed for window_start=#{window_start.to_i})")
             next false

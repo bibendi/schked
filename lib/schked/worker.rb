@@ -117,7 +117,7 @@ module Schked
 
       scheduler.every(DEFAULT_CLEANUP_INTERVAL, as: "Schked::Worker#cleanup_job_runs", overlap: false) do
         cutoff = Time.now.to_i - (DEFAULT_CLEANUP_RETENTION + config.max_skew)
-        logger.info("Cleaning up database job runs older than #{cutoff}")
+        logger.debug("Cleaning up database job runs older than #{cutoff}")
         store.cleanup(cutoff)
       rescue => e
         logger.error("Failed to clean up database job runs: #{e.message}")
@@ -128,15 +128,17 @@ module Schked
     # +RedisJobRunStore#cleanup+ is a no-op (native TTL handles retention),
     # so scheduling it would just log noise on every instance. Custom
     # stores keep the sweep because they implemented +#cleanup+ for it.
+    # Returns +false+ when no store is configured (default mode).
     def database_backed_store?
-      !@job_run_store.is_a?(RedisJobRunStore)
+      !job_run_store.nil? && !job_run_store.is_a?(RedisJobRunStore)
     end
 
     def load_schedule
       dsl = ScheduleDSL.new(
         scheduler: scheduler,
         dedup_enabled: config.dedup_enabled?,
-        max_skew_seconds: config.max_skew
+        max_skew_seconds: config.max_skew,
+        logger: config.logger
       )
       dsl.instance_eval(schedule)
     end

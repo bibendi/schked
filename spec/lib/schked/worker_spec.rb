@@ -378,12 +378,11 @@ describe Schked::Worker do
   end
 
   describe "database-backed store" do
-    let(:fake_connection) { double("PG::Connection") }
     let(:fake_adapter) do
-      Class.new(Schked::Adapters::Pg) do
+      Class.new do
         attr_reader :claims
-        def initialize(conn, logger: nil)
-          super(conn, logger: logger || Logger.new(File::NULL))
+
+        def initialize
           @claims = []
         end
 
@@ -395,7 +394,7 @@ describe Schked::Worker do
         def cleanup(_older_than)
           nil
         end
-      end.new(fake_connection, logger: Logger.new(File::NULL))
+      end.new
     end
 
     before do
@@ -473,6 +472,13 @@ describe Schked::Worker do
       expect(Schked::DatabaseConnection).not_to receive(:detect)
 
       worker.wait
+    end
+
+    it "does not schedule the cleanup sweep when job_run_store is unset" do
+      worker
+
+      cleanup_job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == "Schked::Worker#cleanup_job_runs" }
+      expect(cleanup_job).to be_nil
     end
 
     it "rejects an invalid job_run_store value at construction time" do

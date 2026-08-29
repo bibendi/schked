@@ -38,12 +38,10 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 - `lib/schked/callbacks.rb` — installs rufus callbacks (extracted from Worker): per-job dedup claim, `:as:` enforcement, internal-job exemption.
 - `lib/schked/config.rb` — configuration. New dedup-related options: `job_run_store` (`:redis`/`:database`/custom), `max_skew` (default 60), `database_connection`.
 - `lib/schked/job_run_store.rb` — abstract store interface (`claim`, `cleanup`).
-- `lib/schked/redis_job_run_store.rb` — Redis-backed store (`SET NX EX` with TTL).
-- `lib/schked/adapters/pg.rb` — `PG::Connection` adapter (Postgres `ON CONFLICT`).
-- `lib/schked/adapters/mysql2.rb` — `Mysql2::Client` adapter (`ON DUPLICATE KEY UPDATE`).
-- `lib/schked/adapters/sequel.rb` — `Sequel::Database` adapter (Dataset API).
-- `lib/schked/adapters/active_record.rb` — ActiveRecord adapter (uses `exec_query` with binds).
-- `lib/schked/database_connection.rb` — auto-detects which adapter to build (AR → Sequel) and returns a ready-to-use concrete store.
+- `lib/schked/redis_job_run_store.rb` — Redis-backed store (`SET NX EX`, TTL `max(10×max_skew, 1h)`).
+- `lib/schked/adapters/sequel.rb` — `Sequel::Database` store (Postgres: `insert_conflict`; MySQL: claimer-token read-back via `#synchronize`, because Sequel's `insert_conflict` is Postgres-only).
+- `lib/schked/adapters/active_record.rb` — pool-based ActiveRecord store (PostgreSQL/Mysql2/Trilogy). Every operation runs inside `pool.with_connection`; MySQL claims use a claimer-token read-back because Rails sets `CLIENT_FOUND_ROWS`, making affected_rows unusable.
+- `lib/schked/database_connection.rb` — resolves a store from an explicit object or auto-detects (`ActiveRecord::Base.connection_pool` → `Sequel::DATABASES`).
 - `lib/schked/schedule_dsl.rb` — wraps the rufus DSL to grid-align `every` and reject `interval` in dedup mode.
 - `lib/schked/migration_generator.rb` — DDL constants for `schked generate-migration`.
 - `lib/schked/railtie.rb` — auto-adds `config/schedule.rb` from Rails root and wires `Rails.logger`.
@@ -53,7 +51,7 @@ CI runs in this order: `standardrb` → `rspec agnostic` → `rspec rails` → `
 
 - Core specs use `spec_helper.rb`, which sets `ENV["RACK_ENV"] = "test"`.
 - Rails specs use `rails_helper.rb`, which runs [`Combustion.initialize!`](https://github.com/pat/combustion) before loading `spec_helper`.
-- Database integration specs live in `spec/integration/` and run only under the `postgres`, `mysql`, or `sequel` Appraisal gemfiles (against live services in `docker-compose.yml`).
+- Database integration specs live in `spec/integration/` and run only under the `postgres`, `mysql`, or `sequel` Appraisal gemfiles (against live services in `docker-compose.yml`). The postgres/mysql suites exercise the ActiveRecord adapter (mysql also covers Trilogy); the sequel suite runs against both Postgres and MySQL.
 - Redis is required for tests. `spec_helper.rb` flushes the DB before each example using `ENV["REDIS_URL"]`.
 - In test environments, `Config#standalone?` defaults to `true`, so Redis locking is disabled unless explicitly set to `false`.
 - To run a single spec file locally without Docker: `bundle exec rspec spec/lib/schked/worker_spec.rb`.
@@ -74,4 +72,4 @@ Set `Schked.config.job_run_store = :redis`, `:database`, or a custom object to o
 - `every` jobs are aligned to an absolute time grid via `first_at`; the grid is shifted by `max_skew` so two instances whose clocks differ by up to `max_skew` land on the same slot.
 - `interval` jobs are rejected with `Schked::ScheduleDSL::IntervalNotSupportedError` (their phase drifts with job duration and cannot be deduplicated).
 - Internal Schked jobs ("Schked::Worker#…") skip dedup claims and run on every instance (cleanup sweep, liveness heartbeat).
-- For database-backed dedup, apply the `schked_job_runs` DDL (printed by `schked generate-migration`) to your database; the table requires a UNIQUE index on `(job_name, window_start)`.
+- For database-backed dedup, apply the `schked_job_runs` DDL (printed by `schked generate-migration`, MySQL 8.0+) to your database; the table requires a UNIQUE index on `(job_name, window_start)`.

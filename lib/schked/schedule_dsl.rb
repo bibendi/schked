@@ -15,10 +15,11 @@ module Schked
 
     attr_reader :scheduler
 
-    def initialize(scheduler:, dedup_enabled:, max_skew_seconds: 60)
+    def initialize(scheduler:, dedup_enabled:, max_skew_seconds: 60, logger: Logger.new(File::NULL))
       @scheduler = scheduler
       @dedup_enabled = dedup_enabled
       @max_skew_seconds = Integer(max_skew_seconds)
+      @logger = logger
     end
 
     def respond_to_missing?(name, include_private = false)
@@ -49,8 +50,12 @@ module Schked
         # ahead could pick a different slot than one that is half a skew
         # behind, and both would claim the job.
         first_at = Time.at(next_grid_point_epoch(seconds, Time.now.to_f - @max_skew_seconds))
-        # In dedup mode any user-supplied +first_at:+ is intentionally
-        # overridden — the grid alignment is required for exactly-once.
+        if kwargs.key?(:first_at)
+          @logger.warn(
+            "Schked: ignoring `first_at: #{kwargs[:first_at].inspect}` for `every` job " \
+            "in deduplication mode — grid alignment is required for claims"
+          )
+        end
         kwargs = kwargs.merge(first_at: first_at)
       end
 

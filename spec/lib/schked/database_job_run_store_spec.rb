@@ -3,259 +3,230 @@
 require "spec_helper"
 
 # Unit tests for the per-backend coordination store adapters. These use
-# mocks/spies because the agnostic gemfile does not pull in pg, mysql2,
-# sequel, or activerecord; real-database coverage lives in
+# mocks/spies because the agnostic gemfile does not pull in sequel or
+# activerecord; real-database coverage lives in
 # spec/integration/database_job_run_store_*_spec.rb (run via
 # `dip rspec postgres|mysql|sequel|rails`).
 describe Schked::Adapters do
   let(:logger) { Logger.new(File::NULL) }
 
-  describe Schked::Adapters::Pg do
-    let(:connection) { double("PG::Connection") }
-    subject(:store) { described_class.new(connection, logger: logger) }
+  describe Schked::Adapters::Sequel do
+    describe "on a Postgres database" do
+      let(:database) { double("Sequel::Database", adapter_scheme: "postgres", database_type: :postgres) }
+      let(:dataset) { double("Sequel::Dataset") }
+      let(:insert_ds) { double("Sequel::Dataset") }
+      subject(:store) { described_class.new(database, logger: logger) }
 
-    before do
-      # Shared contract: first claim wins, second loses on the same window.
-      allow(connection).to receive(:exec_params) do |_sql, params|
-        @_pg_inserts ||= {}
-        key = [params[0], params[1]]
-        if @_pg_inserts.key?(key)
-          double("PG::Result", cmd_tuples: 0)
-        else
-          @_pg_inserts[key] = true
-          double("PG::Result", cmd_tuples: 1)
+      before do
+        @_sequel_inserts = {}
+        allow(database).to receive(:[]).with(:schked_job_runs).and_return(dataset)
+        allow(dataset).to receive(:insert_conflict).and_return(insert_ds)
+        allow(insert_ds).to receive(:insert) do |hash|
+          key = [hash[:job_name], hash[:window_start]]
+          if @_sequel_inserts.key?(key)
+            nil # conflict
+          else
+            @_sequel_inserts[key] = true
+            1 # PK
+          end
         end
       end
-      allow(connection).to receive(:exec_params).with(/DELETE/, anything).and_return(nil)
-    end
 
-    it_behaves_like "a job run store"
+      it_behaves_like "a job run store"
 
-    describe "#claim" do
-      it "issues INSERT ... ON CONFLICT DO NOTHING RETURNING id with $N binds" do
-        result = double("PG::Result", cmd_tuples: 1)
-        expect(connection).to receive(:exec_params) do |sql, params|
-          expect(sql).to eq(
-            "INSERT INTO schked_job_runs (job_name, window_start, run_at) " \
-            "VALUES ($1, $2, $3) ON CONFLICT (job_name, window_start) DO NOTHING RETURNING id"
-          )
-          expect(params[0]).to eq "job_a"
-          expect(params[1]).to be_a(Integer)
-          expect(params[2]).to be_a(Float)
-          result
-        end
-
-        expect(store.claim("job_a", Time.now.to_i)).to be true
-      end
-
-      it "returns false when no row is inserted (conflict)" do
-        allow(connection).to receive(:exec_params).and_return(double("PG::Result", cmd_tuples: 0))
-        expect(store.claim("job_a", Time.now.to_i)).to be false
-      end
-    end
-
-    describe "#cleanup" do
-      it "issues DELETE FROM schked_job_runs WHERE window_start < $1" do
-        expect(connection).to receive(:exec_params) do |sql, params|
-          expect(sql).to eq("DELETE FROM schked_job_runs WHERE window_start < $1")
-          expect(params).to eq [1234]
-          nil
-        end
-
-        store.cleanup(1234)
-      end
-    end
-
-    it "reports adapter_name as PostgreSQL" do
-      expect(store.adapter_name).to eq "PostgreSQL"
-    end
-  end
-
-  describe Schked::Adapters::Mysql2 do
-    let(:client) { double("Mysql2::Client") }
-    let(:stmt) { double("Mysql2::Statement") }
-    subject(:store) { described_class.new(client, logger: logger) }
-
-    before do
-      @_mysql_inserts = {}
-      allow(client).to receive(:prepare).and_return(stmt)
-      allow(stmt).to receive(:execute) do |*params|
-        @_mysql_inserts[[params[0], params[1]]] ||= true
-      end
-      allow(stmt).to receive(:affected_rows) do |*|
-        count = @_mysql_inserts.size
-        # 1 on first call, 0 on subsequent calls to the same key.
-        # The shared example calls claim twice with the same args; we
-        # detect by counting entries since each call appends.
-        if count == @_mysql_last_size
-          0
-        else
-          @_mysql_last_size = count
+      it "uses insert_conflict targeting (job_name, window_start) and stores the claimer token" do
+        expect(dataset).to receive(:insert_conflict)
+          .with(target: %i[job_name window_start])
+          .and_return(insert_ds)
+        allow(insert_ds).to receive(:insert) do |hash|
+          expect(hash).to match(job_name: "job_a", window_start: Integer, run_at: Float, claimer: String)
           1
         end
-      end
-    end
 
-    it_behaves_like "a job run store"
-
-    describe "#claim" do
-      it "issues INSERT ... ON DUPLICATE KEY UPDATE id = id via prepared statement" do
-        allow(stmt).to receive(:affected_rows).and_return(1)
-        expect(client).to receive(:prepare) do |sql|
-          expect(sql).to include("ON DUPLICATE KEY UPDATE id = id")
-          stmt
-        end
-
-        expect(store.claim("job_a", Time.now.to_i)).to be true
+        store.claim("job_a", Time.now.to_i)
       end
 
-      it "reads affected_rows from the statement (NOT the client)" do
-        expect(stmt).to receive(:affected_rows).and_return(0)
-        expect(client).not_to receive(:affected_rows)
-
+      it "returns false when Sequel returns nil for the insert (conflict)" do
+        allow(insert_ds).to receive(:insert).and_return(nil)
         expect(store.claim("job_a", Time.now.to_i)).to be false
       end
-    end
 
-    it "reports adapter_name as Mysql2" do
-      expect(store.adapter_name).to eq "Mysql2"
-    end
-  end
+      it "delegates #cleanup to the dataset's where + delete" do
+        expect(dataset).to receive(:where).and_return(double(delete: 1))
+        store.cleanup(1234)
+      end
 
-  describe Schked::Adapters::Sequel do
-    let(:database) { double("Sequel::Database", adapter_scheme: "postgres") }
-    let(:dataset) { double("Sequel::Dataset") }
-    let(:insert_ds) { double("Sequel::Dataset") }
-    subject(:store) { described_class.new(database, logger: logger) }
-
-    before do
-      @_sequel_inserts = {}
-      allow(database).to receive(:[]).with(:schked_job_runs).and_return(dataset)
-      allow(dataset).to receive(:insert_conflict).and_return(insert_ds)
-      allow(insert_ds).to receive(:insert) do |hash|
-        key = [hash[:job_name], hash[:window_start]]
-        if @_sequel_inserts.key?(key)
-          nil # conflict
-        else
-          @_sequel_inserts[key] = true
-          1 # PK
-        end
+      it "reports adapter_name from adapter_scheme" do
+        expect(store.adapter_name).to eq "postgres"
       end
     end
 
-    it_behaves_like "a job run store"
+    describe "on a MySQL database" do
+      let(:database) { double("Sequel::Database", adapter_scheme: "mysql", database_type: :mysql) }
+      let(:dataset) { double("Sequel::Dataset") }
+      let(:ignore_ds) { double("Sequel::Dataset") }
+      let(:conn) { double("Mysql2::Client") }
+      subject(:store) { described_class.new(database, logger: logger) }
 
-    it "uses insert_conflict targeting (job_name, window_start)" do
-      expect(dataset).to receive(:insert_conflict)
-        .with(target: %i[job_name window_start])
-        .and_return(insert_ds)
-      allow(insert_ds).to receive(:insert).and_return(1)
+      before do
+        @_mysql_rows = {}
+        allow(database).to receive(:[]).with(:schked_job_runs).and_return(dataset)
+        allow(dataset).to receive(:insert_ignore).and_return(ignore_ds)
+        allow(ignore_ds).to receive(:insert_sql) do |hash|
+          key = [hash[:job_name], hash[:window_start]]
+          @_mysql_rows[key] ||= hash[:claimer] # first writer wins
+          "INSERT IGNORE INTO schked_job_runs (job_name, window_start, run_at, claimer) VALUES (...)"
+        end
+        allow(database).to receive(:synchronize).and_yield(conn)
+        allow(conn).to receive(:query)
+        allow(dataset).to receive(:where) do |conditions|
+          key = [conditions[:job_name], conditions[:window_start]]
+          where_ds = double("where dataset")
+          allow(where_ds).to receive(:select).with(:claimer) do
+            select_ds = double("select dataset")
+            allow(select_ds).to receive(:first) { {claimer: @_mysql_rows[key]} }
+            select_ds
+          end
+          where_ds
+        end
+      end
 
-      store.claim("job_a", Time.now.to_i)
+      it_behaves_like "a job run store"
+
+      it "reads back the claimer token to decide the winner" do
+        expect(store.claim("job_a", 1234)).to be true
+        expect(store.claim("job_a", 1234)).to be false
+      end
+
+      it "runs the INSERT inside #synchronize (pool checkout)" do
+        expect(database).to receive(:synchronize).and_yield(conn)
+        expect(conn).to receive(:query).with(/INSERT IGNORE INTO schked_job_runs/)
+
+        store.claim("job_a", 1234)
+      end
     end
 
-    it "returns false when Sequel returns nil for the insert (conflict)" do
-      allow(insert_ds).to receive(:insert).and_return(nil)
-      expect(store.claim("job_a", Time.now.to_i)).to be false
-    end
-
-    it "delegates #cleanup to the dataset's where + delete" do
-      expect(dataset).to receive(:where).and_return(double(delete: 1))
-      store.cleanup(1234)
-    end
-
-    it "reports adapter_name from adapter_scheme" do
-      expect(store.adapter_name).to eq "postgres"
+    describe "construction" do
+      it "refuses unsupported databases loudly" do
+        database = double("Sequel::Database", database_type: :sqlite)
+        expect {
+          described_class.new(database, logger: logger)
+        }.to raise_error(ArgumentError, /supports Postgres and MySQL.*sqlite/m)
+      end
     end
   end
 
   describe Schked::Adapters::ActiveRecord do
-    # ActiveRecord-dependent internals are exercised end-to-end in the rails
-    # integration suite. The agnostic/redlock gemfiles do not pull in AR, so
-    # these examples only exercise paths that never reference AR constants.
-    describe "connection validation" do
-      it "accepts PostgreSQL connections" do
-        conn = double("AR::Connection", adapter_name: "PostgreSQL")
-        expect { described_class.new(conn, logger: logger) }.not_to raise_error
+    let(:connection) { double("AR::Connection") }
+    let(:pool) do
+      double("AR::ConnectionPool").tap do |p|
+        allow(p).to receive(:with_connection) { |&block| block.call(connection) }
       end
+    end
+    subject(:store) { described_class.new(pool, logger: logger) }
 
-      it "accepts Mysql2 connections" do
-        conn = double("AR::Connection", adapter_name: "Mysql2")
-        expect { described_class.new(conn, logger: logger) }.not_to raise_error
+    before do
+      allow(connection).to receive(:quote) { |v| v.is_a?(String) ? "'#{v}'" : v.to_s }
+    end
+
+    describe "connection validation" do
+      %w[PostgreSQL Mysql2 Trilogy].each do |name|
+        it "accepts #{name} connections" do
+          allow(connection).to receive(:adapter_name).and_return(name)
+          expect { store }.not_to raise_error
+        end
       end
 
       it "refuses unsupported connections loudly at construction" do
         # A silent fallback would mean every later firing fails per-job;
         # failing fast forces operators to pick a supported backend.
-        conn = double("AR::Connection", adapter_name: "SQLite")
+        allow(connection).to receive(:adapter_name).and_return("SQLite")
         expect {
-          described_class.new(conn, logger: logger)
-        }.to raise_error(ArgumentError, /supports PostgreSQL and Mysql2.*SQLite/m)
+          store
+        }.to raise_error(ArgumentError, /supports PostgreSQL, Mysql2, Trilogy.*SQLite/m)
       end
 
       it "handles connections without adapter_name" do
-        conn = double("AR::Connection")
         expect {
-          described_class.new(conn, logger: logger)
+          store
         }.to raise_error(ArgumentError, /got: ""/)
       end
     end
 
-    describe "#claim on the Mysql2 flavor" do
-      let(:raw_client) { double("Mysql2::Client") }
-      let(:stmt) { double("Mysql2::Statement") }
-      let(:conn) { double("AR::Connection", adapter_name: "Mysql2", raw_connection: raw_client) }
+    describe "on a PostgreSQL connection" do
+      before do
+        allow(connection).to receive(:adapter_name).and_return("PostgreSQL")
+      end
 
-      subject(:store) { described_class.new(conn, logger: logger) }
-
-      it "uses INSERT IGNORE through the underlying client" do
-        allow(raw_client).to receive(:prepare) do |sql|
-          expect(sql).to include("INSERT IGNORE INTO schked_job_runs")
-          stmt
+      it "decides atomically via INSERT ... ON CONFLICT DO NOTHING RETURNING" do
+        result = double("AR::Result", length: 1)
+        expect(connection).to receive(:exec_query) do |sql, name|
+          expect(sql).to include("ON CONFLICT (job_name, window_start) DO NOTHING RETURNING id")
+          expect(sql).to include("claimer")
+          expect(name).to eq "Schked CLAIM"
+          result
         end
-        expect(stmt).to receive(:execute).with("job_a", anything, anything)
-        allow(stmt).to receive(:close)
 
-        # mysql2 sets CLIENT_FOUND_ROWS off by default, so affected_rows == 1
-        # really means "row inserted" (vs matched).
-        allow(stmt).to receive(:affected_rows).and_return(1)
         expect(store.claim("job_a", 1234)).to be true
       end
 
-      it "returns false when the insert was IGNOREd (affected_rows == 0)" do
-        allow(raw_client).to receive(:prepare).and_return(stmt)
-        allow(stmt).to receive(:execute)
-        allow(stmt).to receive(:close)
-        allow(stmt).to receive(:affected_rows).and_return(0)
+      it "returns false when RETURNING yields no row (conflict)" do
+        allow(connection).to receive(:exec_query).and_return(double("AR::Result", length: 0))
         expect(store.claim("job_a", 1234)).to be false
       end
 
-      it "closes the prepared statement" do
-        allow(raw_client).to receive(:prepare).and_return(stmt)
-        allow(stmt).to receive(:execute)
-        allow(stmt).to receive(:affected_rows).and_return(1)
-        expect(stmt).to receive(:close)
-
-        store.claim("job_a", 1234)
-      end
-
-      it "does not call exec_query (which would send Postgres-only SQL)" do
-        allow(raw_client).to receive(:prepare).and_return(stmt)
-        allow(stmt).to receive(:execute)
-        allow(stmt).to receive(:affected_rows).and_return(1)
-        allow(stmt).to receive(:close)
-        expect(conn).not_to receive(:exec_query)
+      it "checks the connection out of the pool for the claim" do
+        expect(pool).to receive(:with_connection).and_yield(connection)
+        allow(connection).to receive(:exec_query).and_return(double("AR::Result", length: 1))
 
         store.claim("job_a", 1234)
       end
     end
 
-    describe "#adapter_name" do
-      it "reports adapter_name from the AR connection" do
-        conn = double("AR::Connection", adapter_name: "PostgreSQL")
-        store = described_class.new(conn, logger: logger)
-        expect(store.adapter_name).to eq "PostgreSQL"
+    describe "on a Mysql2 connection" do
+      before do
+        allow(connection).to receive(:adapter_name).and_return("Mysql2")
       end
+
+      it "writes a unique token and reads it back (CLIENT_FOUND_ROWS-safe)" do
+        tokens = []
+        allow(connection).to receive(:execute) do |sql|
+          expect(sql).to match(/\AINSERT IGNORE INTO schked_job_runs/)
+          tokens << sql[/VALUES \('job_a', 1234, [0-9.]+, '([0-9a-f-]+)'\)/, 1]
+        end
+        allow(connection).to receive(:exec_query) do |sql, _name|
+          expect(sql).to include("SELECT claimer FROM schked_job_runs")
+          double("AR::Result", first: {"claimer" => tokens.first})
+        end
+
+        expect(store.claim("job_a", 1234)).to be true
+      end
+
+      it "loses the claim when another token is stored" do
+        allow(connection).to receive(:execute)
+        allow(connection).to receive(:exec_query)
+          .and_return(double("AR::Result", first: {"claimer" => "someone-else"}))
+
+        expect(store.claim("job_a", 1234)).to be false
+      end
+    end
+
+    describe "#cleanup" do
+      before do
+        allow(connection).to receive(:adapter_name).and_return("PostgreSQL")
+      end
+
+      it "issues DELETE with a quoted cutoff inside a pool checkout" do
+        expect(pool).to receive(:with_connection).and_yield(connection)
+        expect(connection).to receive(:execute).with("DELETE FROM schked_job_runs WHERE window_start < 1234")
+
+        store.cleanup(1234)
+      end
+    end
+
+    it "reports the cached adapter_name" do
+      allow(connection).to receive(:adapter_name).and_return("Trilogy")
+      expect(store.adapter_name).to eq "Trilogy"
     end
   end
 end

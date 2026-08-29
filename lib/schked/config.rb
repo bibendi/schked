@@ -103,9 +103,26 @@ module Schked
     # exist and which combinations are legal.
     def validate!
       validate_job_run_store!
+      validate_max_skew!
     end
 
     private
+
+    def validate_max_skew!
+      return if @max_skew.nil?
+
+      begin
+        skew = Integer(@max_skew)
+      rescue ArgumentError, TypeError
+        raise ArgumentError,
+          "Schked `max_skew` must be a positive number of seconds, got: #{@max_skew.inspect}"
+      end
+
+      return if skew.positive?
+
+      raise ArgumentError,
+        "Schked `max_skew` must be a positive number of seconds, got: #{@max_skew.inspect}"
+    end
 
     def validate_job_run_store!
       return if @job_run_store.nil?

@@ -9,6 +9,7 @@ describe Schked::MigrationGenerator do
       expect(sql).to include("CREATE TABLE schked_job_runs")
       expect(sql).to include("BIGSERIAL")
       expect(sql).to include("UNIQUE")
+      expect(sql).to include("claimer TEXT NOT NULL")
     end
 
     it "returns Postgres DDL when flavor is 'postgres'" do
@@ -20,6 +21,7 @@ describe Schked::MigrationGenerator do
       sql = described_class.sql("mysql")
       expect(sql).to include("AUTO_INCREMENT")
       expect(sql).to include("UNIQUE KEY")
+      expect(sql).to include("claimer VARCHAR(255) NOT NULL")
     end
 
     it "is case-insensitive for the flavor" do

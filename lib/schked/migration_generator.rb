@@ -13,6 +13,7 @@ module Schked
         job_name TEXT NOT NULL,
         window_start BIGINT NOT NULL,
         run_at DOUBLE PRECISION NOT NULL,
+        claimer TEXT NOT NULL,
         CONSTRAINT schked_job_runs_unique UNIQUE (job_name, window_start)
       );
 
@@ -25,6 +26,7 @@ module Schked
         job_name VARCHAR(255) NOT NULL,
         window_start BIGINT NOT NULL,
         run_at DOUBLE NOT NULL,
+        claimer VARCHAR(255) NOT NULL,
         UNIQUE KEY schked_job_runs_unique (job_name, window_start),
         KEY schked_job_runs_window_start_idx (window_start)
       );

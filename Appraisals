@@ -34,14 +34,18 @@ appraise "redlock.1" do
 end
 
 appraise "postgres" do
+  gem "activerecord"
   gem "pg", "~> 1.5"
 end
 
 appraise "mysql" do
+  gem "activerecord"
   gem "mysql2", "~> 0.5"
+  gem "trilogy"
 end
 
 appraise "sequel" do
   gem "sequel", "~> 5.0"
   gem "pg", "~> 1.5"
+  gem "mysql2", "~> 0.5"
 end

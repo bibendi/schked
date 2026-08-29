@@ -46,13 +46,13 @@ module Schked
     private
 
     def default_ttl
-      # TTL must cover the longest possible interval between two firings
-      # plus the maximum clock skew between instances, plus a safety buffer
-      # so the claim key still exists when a slow instance polls it. The
-      # store does not know the per-job interval, so we fall back to 1 day
-      # as a safe default; callers running very long intervals should rely
-      # on the database backend's explicit cleanup job.
-      [2 * @max_skew_seconds + 3600, 86_400].max
+      # The key only needs to outlive the contention window — the interval
+      # (up to +max_skew+, plus scheduling jitter) during which instances
+      # race to claim the same slot. Expiry between windows is harmless:
+      # each window gets its own key. The floor keeps a minimum protective
+      # period for one-shot +at+/+in+ claims against instances that boot
+      # with a delay.
+      [10 * @max_skew_seconds, 3600].max
     end
 
     def build_key(job_name, window_start)
