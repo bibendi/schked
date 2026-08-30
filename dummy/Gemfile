@@ -1,3 +1,14 @@
 source "https://rubygems.org"
 
 gem "schked", path: "/schked"
+
+# Database coordination backends. Loaded lazily from config/environment.rb
+# depending on the SCHKED_DB_DRIVER / SCHKED_DB_ENGINE flags.
+gem "activerecord", require: false
+gem "pg", require: false
+gem "sequel", require: false
+gem "mysql2", require: false
+
+# ActiveRecord on Ruby 3.4+/4.0 needs these as explicit gems
+gem "bigdecimal", require: false
+gem "benchmark", require: false

@@ -1,0 +1,120 @@
+# dip configuration for the dummy app. Run from this directory.
+#
+# Combos are wired through the SCHKED_* feature flags consumed by
+# config/environment.rb: store (database|redis|off) x driver
+# (activerecord|sequel) x engine (postgres|mysql).
+
+version: "7"
+
+interaction:
+  scheduler:
+    command: bundle exec schked start
+    description: Run one scheduler instance (AR + Postgres by default)
+    service: scheduler
+
+  scheduler-mysql:
+    command: bundle exec schked start
+    description: ActiveRecord + MySQL
+    service: scheduler
+    environment:
+      SCHKED_DB_ENGINE: mysql
+
+  scheduler-sequel:
+    command: bundle exec schked start
+    description: Sequel + Postgres
+    service: scheduler
+    environment:
+      SCHKED_DB_DRIVER: sequel
+
+  scheduler-sequel-mysql:
+    command: bundle exec schked start
+    description: Sequel + MySQL
+    service: scheduler
+    environment:
+      SCHKED_DB_DRIVER: sequel
+      SCHKED_DB_ENGINE: mysql
+
+  scheduler-redis:
+    command: bundle exec schked start
+    description: Redis-backed job run store
+    service: scheduler
+    environment:
+      SCHKED_JOB_RUN_STORE: redis
+
+  scheduler-legacy:
+    command: bundle exec schked start
+    description: No dedup at all — plain single-instance scheduler
+    service: scheduler
+    environment:
+      SCHKED_JOB_RUN_STORE: "off"
+
+  cluster:
+    description: Scheduler CLUSTER of 2 (AR + Postgres). Variants - cluster-mysql, cluster-sequel, cluster-sequel-mysql, cluster-redis
+    service: scheduler
+    command: ""
+    compose:
+      method: up
+    environment:
+      SCHEDULERS: 2
+      # Multiple replicas cannot share one fixed host port; publish
+      # ephemeral ports instead (healthcheck runs inside the container).
+      SCHEDULER_PORT: ""
+
+  cluster-mysql:
+    description: Scheduler cluster of 2 (AR + MySQL)
+    service: scheduler
+    command: ""
+    compose:
+      method: up
+    environment:
+      SCHEDULERS: 2
+      SCHEDULER_PORT: ""
+      SCHKED_DB_ENGINE: mysql
+
+  cluster-sequel:
+    description: Scheduler cluster of 2 (Sequel + Postgres)
+    service: scheduler
+    command: ""
+    compose:
+      method: up
+    environment:
+      SCHEDULERS: 2
+      SCHEDULER_PORT: ""
+      SCHKED_DB_DRIVER: sequel
+
+  cluster-sequel-mysql:
+    description: Scheduler cluster of 2 (Sequel + MySQL)
+    service: scheduler
+    command: ""
+    compose:
+      method: up
+    environment:
+      SCHEDULERS: 2
+      SCHEDULER_PORT: ""
+      SCHKED_DB_DRIVER: sequel
+      SCHKED_DB_ENGINE: mysql
+
+  cluster-redis:
+    description: Scheduler cluster of 2 (Redis-backed job run store)
+    service: scheduler
+    command: ""
+    compose:
+      method: up
+    environment:
+      SCHEDULERS: 2
+      SCHEDULER_PORT: ""
+      SCHKED_JOB_RUN_STORE: redis
+
+  bash:
+    description: Shell inside a scheduler container
+    service: scheduler
+
+  postgres-console:
+    description: psql console for the dummy Postgres
+    service: postgres
+    command: psql -U schked -h postgres -d schked
+
+  mysql-console:
+    description: mysql console for the dummy MySQL
+    service: mysql
+    command: mysql -uschked -pschked -h mysql schked
