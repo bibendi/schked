@@ -1,5 +1,5 @@
 [![Gem Version](https://badge.fury.io/rb/schked.svg)](https://badge.fury.io/rb/schked)
-[![Build Status](https://travis-ci.org/bibendi/schked.svg?branch=master)](https://travis-ci.org/bibendi/schked)
+[![Build Status](https://github.com/bibendi/schked/actions/workflows/ruby.yml/badge.svg?branch=master)](https://github.com/bibendi/schked/actions/workflows/ruby.yml)
 
 # Schked
 
