@@ -26,7 +26,11 @@ describe Schked::Worker do
 
   after do
     Thread.abort_on_exception = @taoe
-    worker.stop
+    begin
+      worker.stop
+    rescue
+      # Some tests intentionally raise during worker construction.
+    end
   end
 
   describe "schedule" do
@@ -262,6 +266,260 @@ describe Schked::Worker do
 
           sleep 0.5
         end
+      end
+    end
+  end
+
+  describe "exactly once with the Redis-backed store" do
+    before { config.job_run_store = :redis }
+
+    it "instantiates a RedisJobRunStore when job_run_store = :redis" do
+      expect(Schked::RedisJobRunStore).to receive(:new).and_call_original
+      worker
+    end
+
+    it "does not instantiate a RedisLocker when dedup mode is on" do
+      expect(Schked::RedisLocker).not_to receive(:new)
+      worker
+    end
+
+    it "runs the job when claim succeeds" do
+      store = instance_double(Schked::RedisJobRunStore, claim: true, cleanup: nil)
+      config.job_run_store = store
+
+      Tempfile.open("schedule") do |file|
+        file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"
+        file.flush
+        config.paths << file.path
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect(logger).to receive(:info).with(/inside job/)
+
+        worker
+        sleep 0.5
+
+        expect(store).to have_received(:claim).with("test_task", anything)
+      end
+    end
+
+    it "skips the job when claim fails" do
+      store = instance_double(Schked::RedisJobRunStore, claim: false, cleanup: nil)
+      config.job_run_store = store
+
+      Tempfile.open("schedule") do |file|
+        file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"
+        file.flush
+        config.paths << file.path
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect(logger).not_to receive(:info).with(/inside job/)
+        expect(logger).to receive(:info).with(/Skipped task: test_task/)
+
+        worker
+        sleep 0.5
+
+        expect(store).to have_received(:claim).with("test_task", anything)
+      end
+    end
+
+    it "computes window_start from previous_time when available" do
+      captured = []
+      store = double("store")
+      allow(store).to receive(:claim) do |_job_name, ws|
+        captured << ws
+        true
+      end
+      allow(store).to receive(:cleanup)
+      config.job_run_store = store
+
+      Tempfile.open("schedule") do |file|
+        file.write "self.in('0s', as: :test_task) {}"
+        file.flush
+        config.paths << file.path
+
+        worker
+        sleep 0.5
+      end
+
+      expect(captured.length).to be >= 1
+      expect(captured.first).not_to be_nil
+    end
+  end
+
+  describe "parallel execution of different jobs" do
+    before { config.job_run_store = :redis }
+
+    it "uses distinct claim keys per job (different jobs are not mutually excluded)" do
+      claimed = []
+      store = double("store")
+      allow(store).to receive(:claim) do |job_name, _ws|
+        claimed << job_name
+        true
+      end
+      allow(store).to receive(:cleanup)
+      config.job_run_store = store
+
+      Tempfile.open("schedule") do |file|
+        file.write <<~RUBY
+          self.in('0s', as: :job_a) { logger.info('inside job_a') }
+          self.in('0s', as: :job_b) { logger.info('inside job_b') }
+        RUBY
+        file.flush
+        config.paths << file.path
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+
+        worker
+        sleep 0.5
+      end
+
+      expect(claimed).to include("job_a", "job_b")
+    end
+  end
+
+  describe "database-backed store" do
+    let(:fake_adapter) do
+      Class.new do
+        attr_reader :claims
+
+        def initialize
+          @claims = []
+        end
+
+        def claim(job_name, window_start)
+          @claims << [job_name, window_start]
+          true
+        end
+
+        def cleanup(_older_than)
+          nil
+        end
+      end.new
+    end
+
+    before do
+      config.job_run_store = :database
+      config.database_connection = fake_adapter
+    end
+
+    it "instantiates an adapter from the supplied connection" do
+      expect(Schked::DatabaseConnection).to receive(:detect)
+        .with(connection: fake_adapter, logger: config.logger)
+        .and_call_original
+      worker
+    end
+
+    it "uses the detected adapter as the job run store" do
+      worker
+      expect(worker.send(:job_run_store)).to be fake_adapter
+    end
+
+    it "does not instantiate a RedisLocker" do
+      expect(Schked::RedisLocker).not_to receive(:new)
+      worker
+    end
+
+    it "defines a background cleanup job that calls store.cleanup" do
+      worker
+
+      cleanup_job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == "Schked::Worker#cleanup_job_runs" }
+      expect(cleanup_job).not_to be_nil
+    end
+
+    it "does not schedule the cleanup sweep for the Redis-backed store" do
+      # RedisJobRunStore#cleanup is a no-op; running it would just log noise.
+      config.job_run_store = :redis
+      worker
+
+      cleanup_job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == "Schked::Worker#cleanup_job_runs" }
+      expect(cleanup_job).to be_nil
+    end
+
+    it "claims via the adapter and runs the job" do
+      Tempfile.open("schedule") do |file|
+        file.write "self.in('0s', as: :test_task) { logger.info('inside job') }"
+        file.flush
+        config.paths << file.path
+
+        allow_any_instance_of(Rufus::Scheduler).to receive(:logger).and_return(logger)
+        expect(logger).to receive(:info).with(/inside job/)
+
+        worker
+        sleep 0.5
+      end
+
+      expect(fake_adapter.claims.map(&:first)).to include("test_task")
+    end
+  end
+
+  describe "backward-compatible default" do
+    it "uses the legacy RedisLocker when job_run_store is unset and not standalone" do
+      config.standalone = false
+
+      expect_any_instance_of(Rufus::Scheduler).to receive(:join)
+      expect(Schked::RedisLocker).to receive(:new).and_call_original
+      expect(Schked::RedisJobRunStore).not_to receive(:new)
+      expect(Schked::DatabaseConnection).not_to receive(:detect)
+
+      worker.wait
+    end
+
+    it "does not require any new store or table when job_run_store is unset" do
+      config.standalone = false
+
+      expect_any_instance_of(Rufus::Scheduler).to receive(:join)
+      expect(Schked::JobRunStore).not_to receive(:new)
+      expect(Schked::DatabaseConnection).not_to receive(:detect)
+
+      worker.wait
+    end
+
+    it "does not schedule the cleanup sweep when job_run_store is unset" do
+      worker
+
+      cleanup_job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == "Schked::Worker#cleanup_job_runs" }
+      expect(cleanup_job).to be_nil
+    end
+
+    it "rejects an invalid job_run_store value at construction time" do
+      config.job_run_store = :nonsense
+      expect { described_class.new(config: config) }.to raise_error(ArgumentError, /job_run_store/)
+    end
+  end
+
+  describe "interval job rejection in dedup mode" do
+    before { config.job_run_store = :redis }
+
+    it "raises IntervalNotSupportedError when an interval job is scheduled" do
+      Tempfile.open("schedule") do |file|
+        file.write "interval('5s', as: :bad_job) {}"
+        file.flush
+        config.paths << file.path
+
+        expect { described_class.new(config: config) }.to raise_error(Schked::ScheduleDSL::IntervalNotSupportedError, /interval/)
+      end
+    end
+  end
+
+  describe "every grid alignment across instances" do
+    before { config.job_run_store = :redis }
+
+    it "aligns every-job first_at to the absolute grid" do
+      Tempfile.open("schedule") do |file|
+        file.write "every('6m', as: :grid_job) {}"
+        file.flush
+        config.paths << file.path
+
+        worker
+
+        job = worker.send(:scheduler).jobs.find { |j| j.opts[:as] == :grid_job }
+        expect(job).not_to be_nil
+        expect(job.first_at).not_to be_nil
+
+        first_at = job.first_at.to_f
+        now = Time.now.to_f
+        expect(first_at).to be > now
+        expect(first_at % (6 * 60)).to be_within(1.0).of(0)
       end
     end
   end

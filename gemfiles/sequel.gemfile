@@ -2,11 +2,8 @@
 
 source "https://rubygems.org"
 
-gem "rails", "~> 6"
-gem "benchmark"
-gem "bigdecimal"
-gem "mutex_m"
-gem "tsort"
+gem "sequel", "~> 5.0"
 gem "pg", "~> 1.5"
+gem "mysql2", "~> 0.5"
 
 gemspec path: "../"

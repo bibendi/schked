@@ -49,8 +49,8 @@ simplifies automation and debugging.
 
 Every code change MUST include RSpec coverage for the affected behavior. The full
 CI matrix MUST pass before merging: `standardrb`, `rspec agnostic`, `rspec rails`,
-`rspec redlock.1`. Tests MUST exercise supported Ruby versions (2.7, 3.0, 3.1,
-3.2) and Appraisal gemfiles. Redis MUST be available for test execution.
+`rspec redlock.1`. Tests MUST exercise supported Ruby versions (3.0, 3.1, 3.2)
+and Appraisal gemfiles. Redis MUST be available for test execution.
 
 **Rationale**: Schked coordinates production jobs; regressions in scheduling,
 locking, or Rails integration are costly.
@@ -70,7 +70,7 @@ safe to deploy with zero downtime.
 
 Public API changes MUST follow Semantic Versioning. New features MUST justify
 their added surface area against the core recurring-job scheduling mission.
-Multi-version compatibility (Ruby >= 2.7, multiple Rails and Redlock versions)
+Multi-version compatibility (Ruby >= 3.0, multiple Rails and Redlock versions)
 MUST be maintained via Appraisal.
 
 **Rationale**: A small, stable API reduces maintenance burden and protects
@@ -78,7 +78,7 @@ downstream consumers.
 
 ## Technology & Standards
 
-- Ruby >= 2.7 is the minimum supported runtime.
+- Ruby >= 3.0 is the minimum supported runtime.
 - StandardRB is the mandatory linter; all code MUST pass `bundle exec standardrb`.
 - RSpec is the mandatory test framework.
 - Docker/`dip` provides the canonical local development environment.

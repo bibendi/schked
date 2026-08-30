@@ -4,10 +4,15 @@ require "logger"
 
 module Schked
   class Config
+    VALID_JOB_RUN_STORES = %i[redis database].freeze
+
     attr_writer :logger,
       :do_not_load_root_schedule,
       :redis,
-      :standalone
+      :standalone,
+      :job_run_store,
+      :max_skew,
+      :database_connection
 
     def liveness_probe
       @liveness_probe ||= LivenessProbeConfig.new
@@ -81,7 +86,58 @@ module Schked
       !!@standalone
     end
 
+    attr_reader :job_run_store
+
+    def max_skew
+      @max_skew ||= 60
+    end
+
+    attr_reader :database_connection
+
+    def dedup_enabled?
+      !@job_run_store.nil?
+    end
+
+    # Validates all configuration options. Called by the worker during
+    # initialization so the worker can remain agnostic about which options
+    # exist and which combinations are legal.
+    def validate!
+      validate_job_run_store!
+      validate_max_skew!
+    end
+
     private
+
+    def validate_max_skew!
+      return if @max_skew.nil?
+
+      begin
+        skew = Integer(@max_skew)
+      rescue ArgumentError, TypeError
+        raise ArgumentError,
+          "Schked `max_skew` must be a positive number of seconds, got: #{@max_skew.inspect}"
+      end
+
+      return if skew.positive?
+
+      raise ArgumentError,
+        "Schked `max_skew` must be a positive number of seconds, got: #{@max_skew.inspect}"
+    end
+
+    def validate_job_run_store!
+      return if @job_run_store.nil?
+
+      message = "Schked `job_run_store` must be one of #{VALID_JOB_RUN_STORES.inspect}, " \
+        "a Symbol, or an object responding to #claim and #cleanup; got: #{@job_run_store.inspect}"
+
+      valid = if @job_run_store.is_a?(Symbol)
+        VALID_JOB_RUN_STORES.include?(@job_run_store)
+      else
+        @job_run_store.respond_to?(:claim) && @job_run_store.respond_to?(:cleanup)
+      end
+
+      raise ArgumentError, message unless valid
+    end
 
     def callbacks
       @callbacks ||= Hash.new { |hsh, key| hsh[key] = [] }

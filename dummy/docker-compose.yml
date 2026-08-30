@@ -2,7 +2,9 @@ name: schked-dummy
 
 services:
   scheduler:
-    image: ruby:4.0-slim
+    # Full image (not -slim): pg/mysql2/trilogy gems need build tools and
+    # client dev libraries, which buildpack-deps ships out of the box.
+    image: ruby:4.0
     working_dir: /app
     volumes:
       # Dummy application sources
@@ -13,8 +15,29 @@ services:
       - bundle_cache:/usr/local/bundle
     entrypoint: /app/entrypoint.sh
     command: ["bundle", "exec", "schked", "start"]
+    environment:
+      # Feature flags — see config/environment.rb and dip.yml combos
+      SCHKED_JOB_RUN_STORE: ${SCHKED_JOB_RUN_STORE-database}
+      SCHKED_DB_DRIVER: ${SCHKED_DB_DRIVER-activerecord}
+      SCHKED_DB_ENGINE: ${SCHKED_DB_ENGINE-postgres}
+      SCHKED_MAX_SKEW: ${SCHKED_MAX_SKEW-60}
+      SCHKED_POSTGRES_URL: postgres://schked:schked@postgres:5432/schked
+      SCHKED_MYSQL_URL: mysql2://schked:schked@mysql:3306/schked
+      REDIS_URL: redis://redis:6379/0
+      # Empty SCHEDULER_PORT publishes an ephemeral host port (needed when
+      # scaling to multiple replicas); set it to pin a fixed port.
+      # The healthcheck runs inside the container, so it always works.
     ports:
-      - "8080:8080"
+      - "${SCHEDULER_PORT-8080}:8080"
+    deploy:
+      replicas: ${SCHEDULERS-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     stdin_open: true
     tty: true
     healthcheck:
@@ -24,5 +47,46 @@ services:
       retries: 3
       start_period: 15s
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: schked
+      POSTGRES_PASSWORD: schked
+      POSTGRES_DB: schked
+      # Let `docker compose run postgres psql ...` authenticate silently.
+      PGPASSWORD: schked
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "schked"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: schked
+      MYSQL_USER: schked
+      MYSQL_PASSWORD: schked
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "schked", "-pschked"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   bundle_cache:
+  postgres_data:
+  mysql_data:

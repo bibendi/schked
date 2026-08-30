@@ -1,0 +1,68 @@
+# frozen_string_literal: true
+
+module Schked
+  # Redis-backed implementation of the per-job coordination store.
+  # Uses +SET key 1 NX EX <ttl>+ so the first caller wins and TTL handles
+  # expiration; #cleanup is a no-op because native TTL covers retention.
+  class RedisJobRunStore
+    include JobRunStore
+
+    KEY_PREFIX = "schked:job_run"
+
+    attr_reader :redis_client, :logger, :max_skew_seconds
+
+    def initialize(redis_client:, logger: Logger.new($stdout), max_skew_seconds: 60)
+      @redis_client = redis_client
+      @logger = logger
+      @max_skew_seconds = Integer(max_skew_seconds)
+    end
+
+    def claim(job_name, window_start)
+      validate!(job_name, window_start)
+
+      key = build_key(job_name, window_start)
+      ttl = default_ttl
+
+      # +SET ... NX EX+ is atomic on a single Redis instance and is the
+      # idiomatic primitive for "claim this slot for at most N seconds".
+      # Transport errors (connection refused, timeout, ...) raise out of
+      # this method so the caller knows the store is unavailable — silently
+      # returning +false+ would skip every job while Redis is down.
+      #
+      # Why not Redlock? Redlock (the algorithm used by +RedisLocker+) is
+      # designed for cluster-wide consensus across multiple Redis masters.
+      # For this dedup, a single +SET NX EX+ is already atomic per
+      # instance and sufficient for exactly-once across the cluster of
+      # *schedulers* — the scheduler cluster itself uses one Redis (or a
+      # single master with replicas).
+      redis_client.call("SET", key, "1", "NX", "EX", ttl) == "OK"
+    end
+
+    def cleanup(_older_than)
+      # Native Redis TTL handles expiration; nothing to do here.
+      nil
+    end
+
+    private
+
+    def default_ttl
+      # The key only needs to outlive the contention window — the interval
+      # (up to +max_skew+, plus scheduling jitter) during which instances
+      # race to claim the same slot. Expiry between windows is harmless:
+      # each window gets its own key. The floor keeps a minimum protective
+      # period for one-shot +at+/+in+ claims against instances that boot
+      # with a delay.
+      [10 * @max_skew_seconds, 3600].max
+    end
+
+    def build_key(job_name, window_start)
+      ts = window_start.is_a?(Time) ? window_start.to_i : Integer(window_start)
+      "#{KEY_PREFIX}:#{job_name}:#{ts}"
+    end
+
+    def validate!(job_name, window_start)
+      raise ArgumentError, "job_name must be a non-empty String" if job_name.to_s.empty?
+      raise ArgumentError, "window_start must not be nil" if window_start.nil?
+    end
+  end
+end

@@ -38,11 +38,24 @@ interaction:
         default_args: spec/lib
         command: bundle exec appraisal redlock.1 bundle exec rspec
 
+      postgres:
+        default_args: spec/integration/database_job_run_store_postgres_spec.rb
+        command: bundle exec appraisal postgres bundle exec rspec
+
+      mysql:
+        default_args: spec/integration/database_job_run_store_mysql_spec.rb
+        command: bundle exec appraisal mysql bundle exec rspec
+
+      sequel:
+        default_args: spec/integration/database_job_run_store_sequel_spec.rb
+        command: bundle exec appraisal sequel bundle exec rspec
+
       rails:
         default_args: spec/rails
         command: bundle exec appraisal bundle exec rspec
 
   standardrb:
+
     description: Run Standard commands
     service: ruby
     command: bundle exec standardrb

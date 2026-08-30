@@ -30,9 +30,9 @@ gem install schked
 
 ## Supported Ruby and Rails versions
 
-Schked requires **Ruby 2.7+**.
+Schked requires **Ruby 3.0+**.
 
-The test matrix covers Ruby **2.7, 3.0, 3.1, 3.2, 3.3, 3.4, and 4.0**. Rails integration tests run on every Ruby; Rails 8 is only included on Ruby **3.2+**.
+The test matrix covers Ruby **3.0, 3.1, 3.2, 3.3, 3.4, and 4.0**. Rails integration tests run on every Ruby; Rails 8 is only included on Ruby **3.2+**.
 
 ## Usage
 
@@ -80,13 +80,78 @@ bundle exec schked show
 
 ### Duplicate scheduling
 
-When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked is using Redis for locks.
+Schked ships two coordination strategies for multi-instance deployments. Choose one via `Schked.config.job_run_store`:
+
+#### Single-active-instance (default)
+
+When you deploy your schedule to production, you want to start new instance before you shut down the current. And you don't want simultaneous working of both. To achieve a seamless transition, Schked uses Redis for a global lock.
 
 You can configure Redis client as the following:
 
 ```ruby
 Schked.config.redis = {url: ENV.fetch("REDIS_URL") }
 ```
+
+This is the default — one instance runs all jobs; standby instances hold the global Redis lock and stay idle. This strategy will continue to be supported because it is the simplest and most predictable for many setups.
+
+#### Per-job deduplication
+
+When you want every scheduler instance to do useful work (and not require a global leader), opt into the per-job deduplication mode. Each recurring job claims its schedule interval atomically; only one instance wins each interval, so each job still runs exactly once across the cluster.
+
+Pick a coordination store:
+
+```ruby
+# Redis-backed (default Redis client from Schked.config.redis):
+Schked.config.job_run_store = :redis
+
+# Database-backed (no Redis required). The ActiveRecord or Sequel
+# connection pool is auto-detected; override via:
+Schked.config.job_run_store = :database
+Schked.config.database_connection = conn   # optional: Sequel::Database, ActiveRecord pool, or AR connection (PostgreSQL, Mysql2, or Trilogy)
+
+# Custom store responding to #claim(job_name, window_start) and #cleanup(older_than):
+Schked.config.job_run_store = my_store
+```
+
+The database backend runs entirely through the ActiveRecord/Sequel connection pool: claims and the internal cleanup sweep check connections out per operation, so they are thread-safe and survive database restarts and failovers. MySQL 8.0+ is required for the MySQL DDL.
+
+Additional tuning:
+
+```ruby
+Schked.config.max_skew = 60  # max expected clock skew between instances (seconds)
+```
+
+Schedule behavior in deduplication mode:
+
+- `every` jobs are aligned to an absolute time grid so all instances share the same phase. The first firing is the next grid point relative to now — not relative to process start.
+- `cron` jobs already align to absolute time natively and need no change.
+- `at` / `in` (one-time) jobs are deduplicated too — the claim is kept for the store's retention period (the Redis TTL / the database sweep window).
+- `interval` jobs **are not supported** and raise `Schked::ScheduleDSL::IntervalNotSupportedError` when scheduled in this mode. Their phase depends on job duration and cannot be grid-aligned. Use `every` or `cron` instead.
+
+##### Durability of the coordination store
+
+Choosing between `:redis` and `:database` is also choosing how strong the exactly-once guarantee is:
+
+- **`:database`** — claims are durable rows guarded by a UNIQUE constraint. They survive database restarts and failovers, and nothing removes them before the internal cleanup sweep (which keeps rows for 24 hours). Prefer this backend when a duplicate run is unacceptable.
+- **`:redis`** — claims are keys with a TTL of `max(10 × max_skew, 1 hour)`, so the guarantee is only as strong as the Redis instance's durability:
+  - **Eviction policy** must be `noeviction` (or the instance must never reach `maxmemory`). Claim keys have a TTL, so both `allkeys-*` and `volatile-*` policies can evict them under memory pressure — the evicted window may then be claimed and executed by another instance.
+  - **Persistence**: a Redis restart without AOF/RDB loses in-flight claims. If it happens inside the contention window (the `max_skew`-wide interval during which instances race to claim the same slot), the job may run twice. Enable AOF, or use `:database` if you cannot accept that risk.
+
+Failure semantics (both backends):
+
+- The claim is taken **before** the job runs, so the semantics are *at-most-once per window*: if the winning instance crashes mid-run, that window's execution is lost and Schked does not retry it.
+- The coordination store is a hard dependency: when it is unreachable, the claim fails and the firing is skipped (fail-closed) rather than risking a duplicate.
+
+##### Database store migration
+
+Run the migration generator to print the `schked_job_runs` DDL:
+
+```sh
+bundle exec schked generate-migration               # Postgres
+bundle exec schked generate-migration --flavor=mysql
+```
+
+Copy the SQL into your application's migration and run it. The gem does not write migration files or run DDL on its own — it stays framework-agnostic.
 
 ### Callbacks
 
